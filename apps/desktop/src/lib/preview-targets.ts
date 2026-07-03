@@ -1,4 +1,5 @@
 const PREVIEW_MARKDOWN_RE = /\[Preview:[^\]]+\]\((?<href>#preview[:/][^)]+)\)/gi
+const RAW_FILE_TARGET_RE = /(^|[\s`("'])(?<target>(?:file:\/\/[^\s`)'"<>]+|[A-Za-z]:[\\/][^\s`)'"<>]+|\/(?!\/)[^\s`)'"<>]+))/g
 
 export function stripPreviewTargets(text: string): string {
   return text
@@ -12,16 +13,26 @@ export function extractPreviewTargets(text: string): string[] {
   const targets: string[] = []
   const seen = new Set<string>()
 
-  for (const match of text.matchAll(PREVIEW_MARKDOWN_RE)) {
-    const target = previewTargetFromMarkdownHref(match.groups?.href)
-
+  const pushTarget = (target: string | null) => {
     if (target && !seen.has(target)) {
       seen.add(target)
       targets.push(target)
     }
   }
 
+  for (const match of text.matchAll(PREVIEW_MARKDOWN_RE)) {
+    pushTarget(previewTargetFromMarkdownHref(match.groups?.href))
+  }
+
+  for (const match of text.matchAll(RAW_FILE_TARGET_RE)) {
+    pushTarget(normalizeRawFilePreviewTarget(match.groups?.target))
+  }
+
   return targets
+}
+
+export function mayContainPreviewTarget(text: string): boolean {
+  return /#preview[:/]|file:\/\/|(^|[\s`("'])(?:[A-Za-z]:[\\/]|\/(?!\/))/i.test(text)
 }
 
 export function previewMarkdownHref(target: string): string {
@@ -38,6 +49,24 @@ export function previewTargetFromMarkdownHref(href?: string): string | null {
   } catch {
     return null
   }
+}
+
+export function normalizeRawFilePreviewTarget(target?: string): string | null {
+  const clean = target?.trim().replace(/[),.;:]+$/, '')
+
+  if (!clean) {
+    return null
+  }
+
+  if (/^https?:\/\//i.test(clean)) {
+    return null
+  }
+
+  if (/^file:\/\//i.test(clean) || /^[A-Za-z]:[\\/]/.test(clean) || clean.startsWith('/')) {
+    return clean
+  }
+
+  return null
 }
 
 export function previewName(target: string): string {

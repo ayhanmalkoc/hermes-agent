@@ -31,7 +31,7 @@ import {
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { GitBranchIcon, Loader2Icon, Volume2Icon, VolumeXIcon, XIcon } from '@/lib/icons'
-import { extractPreviewTargets } from '@/lib/preview-targets'
+import { extractPreviewTargets, mayContainPreviewTarget } from '@/lib/preview-targets'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
 import { playSpeechText, stopVoicePlayback } from '@/lib/voice-playback'
@@ -74,7 +74,7 @@ export const AssistantMessage: FC<{
   )
 
   const previewTargets = useMemo(() => {
-    if (!completedText || !/(https?:\/\/|file:\/\/)/i.test(completedText)) {
+    if (!completedText || !mayContainPreviewTarget(completedText)) {
       return []
     }
 

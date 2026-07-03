@@ -1,11 +1,42 @@
 import { describe, expect, it } from 'vitest'
 
-import { extractPreviewTargets, previewTargetFromMarkdownHref, stripPreviewTargets } from './preview-targets'
+import {
+  extractPreviewTargets,
+  mayContainPreviewTarget,
+  normalizeRawFilePreviewTarget,
+  previewTargetFromMarkdownHref,
+  stripPreviewTargets
+} from './preview-targets'
 
 describe('preview target detection', () => {
-  it('does not infer preview targets from raw paths or URLs', () => {
+  it('does not infer preview targets from URLs', () => {
     expect(extractPreviewTargets('Preview: http://localhost:5173/')).toEqual([])
-    expect(extractPreviewTargets('Open index.html\n/tmp/demo.html\nhttp://localhost:5173/')).toEqual([])
+    expect(extractPreviewTargets('Open index.html\nhttp://localhost:5173/tmp/demo.html')).toEqual([])
+  })
+
+  it('extracts raw local and remote file paths as preview targets', () => {
+    expect(
+      extractPreviewTargets([
+        'Dosya:',
+        '`/var/lib/hermes/Downloads/stock-rabbits/videos/`',
+        '- C:\\Users\\me\\Downloads\\rabbit.mp4',
+        '- file:///tmp/rabbit.mp4'
+      ].join('\n'))
+    ).toEqual([
+      '/var/lib/hermes/Downloads/stock-rabbits/videos/',
+      'C:\\Users\\me\\Downloads\\rabbit.mp4',
+      'file:///tmp/rabbit.mp4'
+    ])
+  })
+
+  it('detects possible preview targets before extraction', () => {
+    expect(mayContainPreviewTarget('Dosya: `/var/lib/hermes/out.mp4`')).toBe(true)
+    expect(mayContainPreviewTarget('Preview: http://localhost:5173/')).toBe(false)
+  })
+
+  it('normalizes raw file targets conservatively', () => {
+    expect(normalizeRawFilePreviewTarget('/var/lib/hermes/out.mp4.')).toBe('/var/lib/hermes/out.mp4')
+    expect(normalizeRawFilePreviewTarget('http://localhost/out.mp4')).toBeNull()
   })
 
   it('decodes preview markdown hrefs', () => {
