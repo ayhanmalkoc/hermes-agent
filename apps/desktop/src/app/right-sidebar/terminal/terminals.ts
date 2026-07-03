@@ -1,6 +1,13 @@
 import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
+import {
+  closeAllRightWorkspaceTerminalTabs,
+  closeOtherRightWorkspaceTerminalTabs,
+  closeRightWorkspaceTabForTerminal,
+  openTerminalWorkspaceForTerminal,
+  selectRightWorkspaceTabForTerminal
+} from '@/store/right-workspace'
 import { $currentCwd } from '@/store/session'
 
 import { setTerminalTakeover } from '../store'
@@ -158,6 +165,27 @@ export function createTerminal(cwd: string = $currentCwd.get()): string {
   return id
 }
 
+export function createAndOpenTerminal(cwd?: string): string {
+  const id = createTerminal(cwd)
+
+  openTerminalWorkspaceForTerminal(id)
+  setTerminalTakeover(true)
+
+  return id
+}
+
+export function showTerminalWorkspace(): string {
+  const list = $terminals.get()
+  const id = $activeTerminalId.get() ?? list[0]?.id ?? createTerminal()
+  const title = $terminals.get().find(term => term.id === id)?.title
+
+  openTerminalWorkspaceForTerminal(id, title)
+  $activeTerminalId.set(id)
+  setTerminalTakeover(true)
+
+  return id
+}
+
 // Procs we've already surfaced a tab for — so closing an agent tab doesn't
 // resurrect it on the next poll while the process is still running.
 const surfacedProcs = new Set<string>()
@@ -180,6 +208,7 @@ export function ensureAgentTerminal(procId: string, title: string): string | nul
   surfacedProcs.add(procId)
   const id = newId()
   $terminals.set([...$terminals.get(), { id, title: title || 'agent', auto: false, cwd: '', kind: 'agent', procId }])
+  openTerminalWorkspaceForTerminal(id, title || 'agent', false)
 
   return id
 }
@@ -197,6 +226,7 @@ export function openAgentTerminal(procId: string, title: string): void {
   }
 
   $activeTerminalId.set(id)
+  openTerminalWorkspaceForTerminal(id, title || 'agent')
   setTerminalTakeover(true)
 }
 
@@ -205,13 +235,15 @@ export function openAgentTerminal(procId: string, title: string): void {
  *  second, unrelated user shell just because the pane became visible. */
 export function ensureTerminal(): void {
   if ($terminals.get().length === 0) {
-    createTerminal()
+    const id = createTerminal()
+    openTerminalWorkspaceForTerminal(id)
   }
 }
 
 export function selectTerminal(id: string): void {
   if ($terminals.get().some(term => term.id === id)) {
     $activeTerminalId.set(id)
+    selectRightWorkspaceTabForTerminal(id)
   }
 }
 
@@ -228,7 +260,7 @@ export function cycleTerminal(direction: 1 | -1): void {
     list.findIndex(term => term.id === $activeTerminalId.get())
   )
 
-  $activeTerminalId.set(list[(current + direction + list.length) % list.length].id)
+  selectTerminal(list[(current + direction + list.length) % list.length].id)
 }
 
 /** Drop a terminal. Focus slides to the neighbor that fills its slot; closing
@@ -245,8 +277,15 @@ export function closeTerminal(id: string): void {
   $terminals.set(next)
 
   if ($activeTerminalId.get() === id) {
-    $activeTerminalId.set((next[index] ?? next[index - 1])?.id ?? null)
+    const nextActive = (next[index] ?? next[index - 1])?.id ?? null
+    $activeTerminalId.set(nextActive)
+
+    if (nextActive) {
+      selectRightWorkspaceTabForTerminal(nextActive)
+    }
   }
+
+  closeRightWorkspaceTabForTerminal(id)
 
   if (!next.length) {
     setTerminalTakeover(false)
@@ -285,6 +324,7 @@ export function closeAllTerminals(): void {
 
   $terminals.set([])
   $activeTerminalId.set(null)
+  closeAllRightWorkspaceTerminalTabs()
   setTerminalTakeover(false)
 }
 
@@ -294,6 +334,8 @@ export function closeOtherTerminals(id: string): void {
   if (keep) {
     $terminals.set([keep])
     $activeTerminalId.set(keep.id)
+    closeOtherRightWorkspaceTerminalTabs(keep.id)
+    selectRightWorkspaceTabForTerminal(keep.id)
   }
 }
 

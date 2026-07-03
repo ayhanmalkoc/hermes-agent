@@ -14,8 +14,8 @@ interface TerminalWorkspaceProps {
 
 /** The persistent-overlay layer: the stack of live xterm instances (only these
  *  must stay in the fixed overlay, for the WebGL host). Mount/visibility is owned
- *  by PersistentTerminal (latched so shells survive hiding); the tab rail and
- *  new-terminal control live in the pane DOM — see TerminalPaneChrome. */
+ *  by PersistentTerminal (latched so shells survive hiding); terminal tabs live
+ *  in the right-workspace header. */
 export function TerminalWorkspace({ onAddSelectionToChat }: TerminalWorkspaceProps) {
   const terminals = useStore($terminals)
   const activeId = useStore($activeTerminalId)

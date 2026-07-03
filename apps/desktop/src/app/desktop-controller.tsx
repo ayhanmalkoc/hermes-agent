@@ -37,9 +37,9 @@ import {
   $rightWorkspaceTabs,
   closeActiveRightWorkspaceTab,
   openReviewWorkspace,
-  openTerminalWorkspace,
   RIGHT_WORKSPACE_PANE_ID
 } from '../store/right-workspace'
+import { showTerminalWorkspace } from './right-sidebar/terminal/terminals'
 import { $paneOpen } from '../store/panes'
 import { setPetActivity } from '../store/pet'
 import { setPetScale } from '../store/pet-gallery'
@@ -225,7 +225,7 @@ export function DesktopController() {
 
   useEffect(() => {
     if (terminalTakeover) {
-      openTerminalWorkspace()
+      showTerminalWorkspace()
     }
   }, [terminalTakeover])
 
@@ -1151,4 +1151,3 @@ function LegacySessionRedirect() {
 
   return <Navigate replace to={sessionId ? sessionRoute(sessionId) : NEW_CHAT_ROUTE} />
 }
-

@@ -54,6 +54,11 @@ hermes_agent.egg-info/
 wandb/
 testlogs
 
+# Local/generated analysis artifacts
+build/
+reports/
+ARTIFACT_SURFACE_REVIEW.md
+
 # CLI config (may contain sensitive SSH paths)
 cli-config.yaml
 

@@ -11,6 +11,7 @@ import {
 import { Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { setTerminalTakeover } from '../right-sidebar/store'
+import { $terminals, closeTerminal, createAndOpenTerminal, selectTerminal } from '../right-sidebar/terminal/terminals'
 import {
   $activeRightWorkspaceTab,
   $rightWorkspaceSizeMode,
@@ -18,9 +19,9 @@ import {
   closeRightWorkspaceTab,
   openEmptyFilesWorkspace,
   openReviewWorkspace,
-  openTerminalWorkspace,
   selectRightWorkspaceTab,
   toggleRightWorkspaceSize,
+  type RightWorkspaceTab,
   type RightWorkspaceTabKind
 } from '@/store/right-workspace'
 
@@ -44,11 +45,37 @@ function openKind(kind: RightWorkspaceTabKind): void {
   if (kind === 'review') {
     openReviewWorkspace()
   } else if (kind === 'terminal') {
-    setTerminalTakeover(true)
-    openTerminalWorkspace()
+    createAndOpenTerminal()
   } else {
     openEmptyFilesWorkspace()
   }
+}
+
+function tabTitle(tab: RightWorkspaceTab, terminals: readonly { id: string; title: string }[]): string {
+  if (tab.kind !== 'terminal' || !tab.terminalId) {
+    return tab.title
+  }
+
+  return terminals.find(term => term.id === tab.terminalId)?.title ?? tab.title
+}
+
+function selectTab(tab: RightWorkspaceTab): void {
+  if (tab.kind === 'terminal' && tab.terminalId) {
+    selectTerminal(tab.terminalId)
+    setTerminalTakeover(true)
+    return
+  }
+
+  selectRightWorkspaceTab(tab.id)
+}
+
+function closeTab(tab: RightWorkspaceTab): void {
+  if (tab.kind === 'terminal' && tab.terminalId) {
+    closeTerminal(tab.terminalId)
+    return
+  }
+
+  closeRightWorkspaceTab(tab.id)
 }
 
 function NewTabMenu() {
@@ -117,6 +144,7 @@ function RightWorkspaceHeader() {
   const tabs = useStore($rightWorkspaceTabs)
   const active = useStore($activeRightWorkspaceTab)
   const sizeMode = useStore($rightWorkspaceSizeMode)
+  const terminals = useStore($terminals)
 
   return (
     <div className="flex h-9 shrink-0 items-center border-b border-(--ui-stroke-quaternary) bg-(--ui-editor-surface-background) px-2">
@@ -130,18 +158,18 @@ function RightWorkspaceHeader() {
                 : 'text-(--ui-text-tertiary) hover:bg-(--ui-hover-background) hover:text-(--ui-text-secondary)'
             )}
             key={tab.id}
-            onClick={() => selectRightWorkspaceTab(tab.id)}
-            title={tab.title}
+            onClick={() => selectTab(tab)}
+            title={tabTitle(tab, terminals)}
             type="button"
           >
             <Codicon name={iconFor(tab.kind)} size="0.85rem" />
-            <span className="min-w-0 flex-1 truncate">{tab.title}</span>
+            <span className="min-w-0 flex-1 truncate">{tabTitle(tab, terminals)}</span>
             <span
               className="grid size-4 place-items-center rounded opacity-0 hover:bg-(--ui-hover-background) group-hover:opacity-100"
               onClick={event => {
                 event.preventDefault()
                 event.stopPropagation()
-                closeRightWorkspaceTab(tab.id)
+                closeTab(tab)
               }}
               role="button"
               tabIndex={-1}
@@ -173,7 +201,7 @@ function RightWorkspaceContent() {
   }
 
   if (active.kind === 'terminal') {
-    return <TerminalWorkspaceTab />
+    return <TerminalWorkspaceTab tab={active} />
   }
 
   return <FilesWorkspaceTab tab={active} />

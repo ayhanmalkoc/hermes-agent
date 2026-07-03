@@ -14,6 +14,7 @@ export interface RightWorkspaceTab {
   id: string
   kind: RightWorkspaceTabKind
   title: string
+  terminalId?: string
   target?: PreviewTarget | null
   treeVisible?: boolean
   richPreviewEnabled?: boolean
@@ -25,8 +26,10 @@ export interface RightWorkspaceTab {
 }
 
 export interface OpenRightWorkspaceTabInput {
+  activate?: boolean
   kind: RightWorkspaceTabKind
   target?: PreviewTarget | null
+  terminalId?: string
   title?: string
 }
 
@@ -65,9 +68,17 @@ function singletonId(kind: RightWorkspaceTabKind): string {
   return kind
 }
 
+function terminalTabId(terminalId: string): string {
+  return `terminal:${terminalId}`
+}
+
 function tabIdFor(input: OpenRightWorkspaceTabInput): string {
   if (input.kind === 'files') {
     return filesTabId(input.target)
+  }
+
+  if (input.kind === 'terminal' && input.terminalId) {
+    return terminalTabId(input.terminalId)
   }
 
   return singletonId(input.kind)
@@ -105,6 +116,7 @@ function buildRightWorkspaceTab(
     treeFilter: existing?.treeFilter ?? '',
     selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
     target: input.kind === 'files' ? (input.target ?? null) : undefined,
+    terminalId: input.kind === 'terminal' ? input.terminalId : undefined,
     title: defaultTitle(input),
     treeVisible: existing?.treeVisible ?? (input.kind !== 'terminal')
   }
@@ -122,7 +134,11 @@ export function openRightWorkspaceTab(input: OpenRightWorkspaceTabInput): RightW
   const nextTab = buildRightWorkspaceTab(input, id, timestamp, existing)
 
   $rightWorkspaceTabs.set(existing ? current.map(tab => (tab.id === id ? { ...tab, ...nextTab } : tab)) : [...current, nextTab])
-  $activeRightWorkspaceTabId.set(id)
+
+  if (input.activate !== false) {
+    $activeRightWorkspaceTabId.set(id)
+  }
+
   setRightWorkspaceOpen(true)
 
   return nextTab
@@ -150,6 +166,37 @@ export function closeRightWorkspaceTab(id: string): void {
   if ($activeRightWorkspaceTabId.get() === id) {
     $activeRightWorkspaceTabId.set((next[index] ?? next[index - 1])?.id ?? null)
   }
+}
+
+export function closeRightWorkspaceTabForTerminal(terminalId: string): void {
+  closeRightWorkspaceTab(terminalTabId(terminalId))
+}
+
+export function closeAllRightWorkspaceTerminalTabs(): void {
+  const current = $rightWorkspaceTabs.get()
+  const next = current.filter(tab => tab.kind !== 'terminal')
+
+  $rightWorkspaceTabs.set(next)
+
+  if ($activeRightWorkspaceTabId.get() && !next.some(tab => tab.id === $activeRightWorkspaceTabId.get())) {
+    $activeRightWorkspaceTabId.set(next.at(-1)?.id ?? null)
+  }
+}
+
+export function closeOtherRightWorkspaceTerminalTabs(terminalId: string): void {
+  const keepId = terminalTabId(terminalId)
+  const current = $rightWorkspaceTabs.get()
+  const next = current.filter(tab => tab.kind !== 'terminal' || tab.id === keepId)
+
+  $rightWorkspaceTabs.set(next)
+
+  if ($activeRightWorkspaceTabId.get() && !next.some(tab => tab.id === $activeRightWorkspaceTabId.get())) {
+    $activeRightWorkspaceTabId.set(keepId)
+  }
+}
+
+export function selectRightWorkspaceTabForTerminal(terminalId: string): void {
+  selectRightWorkspaceTab(terminalTabId(terminalId))
 }
 
 export function toggleRightWorkspaceSize(): void {
@@ -210,6 +257,10 @@ export function openReviewWorkspace(): RightWorkspaceTab {
 
 export function openTerminalWorkspace(): RightWorkspaceTab {
   return openRightWorkspaceTab({ kind: 'terminal' })
+}
+
+export function openTerminalWorkspaceForTerminal(terminalId: string, title = 'Terminal', activate = true): RightWorkspaceTab {
+  return openRightWorkspaceTab({ activate, kind: 'terminal', terminalId, title })
 }
 
 export function closeActiveRightWorkspaceTab(): void {

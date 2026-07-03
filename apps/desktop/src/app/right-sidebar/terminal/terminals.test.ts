@@ -87,4 +87,18 @@ describe('terminal store persistence', () => {
     closeAllTerminals()
     expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
+
+  it('opens and closes matching right workspace tabs', async () => {
+    const { closeTerminal, createAndOpenTerminal } = await loadTerminalStore()
+    const { $activeRightWorkspaceTabId, $rightWorkspaceTabs } = await import('@/store/right-workspace')
+
+    const userId = createAndOpenTerminal('/repo')
+
+    expect($rightWorkspaceTabs.get()).toMatchObject([{ id: `terminal:${userId}`, kind: 'terminal', terminalId: userId }])
+    expect($activeRightWorkspaceTabId.get()).toBe(`terminal:${userId}`)
+
+    closeTerminal(userId)
+
+    expect($rightWorkspaceTabs.get()).toEqual([])
+  })
 })
