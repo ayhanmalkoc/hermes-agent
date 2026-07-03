@@ -181,7 +181,10 @@ function RightWorkspaceContent() {
 
 export function RightWorkspace() {
   return (
-    <aside className="relative flex h-full w-full min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background) text-(--ui-text-tertiary)">
+    <aside
+      className="relative flex h-full w-full min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background) text-(--ui-text-tertiary)"
+      style={{ paddingTop: 'var(--right-rail-top-inset, 0px)' }}
+    >
       <RightWorkspaceHeader />
       <RightWorkspaceContent />
     </aside>
