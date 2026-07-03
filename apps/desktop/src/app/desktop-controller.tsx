@@ -1053,6 +1053,7 @@ export function DesktopController() {
   const railSide = panesFlipped ? 'left' : 'right'
 
   const railColumnOpen = rightWorkspaceOpen && rightWorkspaceTabs.length > 0
+  const rightWorkspaceExpanded = railColumnOpen && rightWorkspaceSizeMode === 'expanded'
 
   // Once the terminal would share its rail with another sidebar, drop it to a
   // full-width row beneath them rather than cramming in one more skinny column.
@@ -1064,11 +1065,11 @@ export function DesktopController() {
       disabled={!chatOpen && currentView !== 'artifacts'}
       id={RIGHT_WORKSPACE_PANE_ID}
       key="right-workspace"
-      maxWidth={rightWorkspaceSizeMode === 'expanded' ? '80vw' : '42rem'}
+      maxWidth={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '42rem'}
       minWidth="22rem"
       resizable
       side={railSide}
-      width={rightWorkspaceSizeMode === 'expanded' ? '72vw' : '34rem'}
+      width={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '34rem'}
     >
       <RightWorkspace />
     </Pane>
@@ -1101,7 +1102,7 @@ export function DesktopController() {
           {sidebar}
         </Pane>
       )}
-      <PaneMain>
+      <PaneMain className={cn(rightWorkspaceExpanded && 'opacity-0 pointer-events-none')}>
         <Routes>
           <Route element={chatView} index />
           <Route element={chatView} path=":sessionId" />

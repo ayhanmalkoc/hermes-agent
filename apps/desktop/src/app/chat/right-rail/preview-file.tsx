@@ -36,6 +36,7 @@ import { notifyWorkspaceChanged } from '@/store/workspace-events'
 
 const SHIKI_THEME = { dark: 'github-dark-default', light: 'github-light-default' } as const
 const TEXT_PREVIEW_MAX_BYTES = 512 * 1024
+const FILES_PREVIEW_MAX_BYTES = 10 * 1024 * 1024
 const SOURCE_CHUNK_LINES = 200
 const SOURCE_LINE_PX = 20
 const SOURCE_OVERSCAN_LINES = 400
@@ -567,14 +568,37 @@ function SourceView({
   )
 }
 
+
+function SourceWrapView({ filePath, language, text }: { filePath: string; language: string; text: string }) {
+  return (
+    <div className="h-full overflow-auto bg-transparent" data-selectable-text="true">
+      <div className="preview-source-code min-w-0 whitespace-pre-wrap break-words p-3 font-mono text-[0.7rem] leading-relaxed [&_code]:whitespace-pre-wrap [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:break-words">
+        <ShikiHighlighter
+          addDefaultStyles={false}
+          as="div"
+          defaultColor="light-dark()"
+          delay={80}
+          language={language || shikiLanguageForFilename(filePath) || 'text'}
+          showLanguage={false}
+          theme={SHIKI_THEME}
+        >
+          {text}
+        </ShikiHighlighter>
+      </div>
+    </div>
+  )
+}
+
 type PreviewViewMode = 'diff' | 'rendered' | 'source'
 
 export function LocalFilePreview({
+  filesMode = false,
   reloadKey,
   richPreviewEnabled = true,
   target,
   wordWrapEnabled = true
 }: {
+  filesMode?: boolean
   reloadKey: number
   richPreviewEnabled?: boolean
   target: PreviewTarget
@@ -606,6 +630,9 @@ export function LocalFilePreview({
   const hoverRef = useRef(false)
   const filePath = filePathForTarget(target)
   const isImage = target.previewKind === 'image'
+  const isAudio = target.previewKind === 'audio'
+  const isVideo = target.previewKind === 'video'
+  const previewMaxBytes = filesMode ? FILES_PREVIEW_MAX_BYTES : TEXT_PREVIEW_MAX_BYTES
 
   useEffect(() => {
     setUserMode(null)
@@ -623,7 +650,12 @@ export function LocalFilePreview({
   // when the file is forcibly previewed past the binary refusal screen.
   const isText = target.previewKind === 'text' || target.previewKind === 'binary' || target.previewKind === 'html'
 
-  const blockedByTarget = !isImage && !forcePreview && (target.binary || target.large)
+  const blockedByTarget =
+    !isImage &&
+    !isAudio &&
+    !isVideo &&
+    !forcePreview &&
+    (target.binary || (target.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
 
   useEffect(() => {
     let active = true
@@ -659,7 +691,7 @@ export function LocalFilePreview({
         const result = await readTextPreview(filePath)
 
         if (active) {
-          const shouldBlock = !forcePreview && (result.binary || (result.byteSize ?? 0) > TEXT_PREVIEW_MAX_BYTES)
+          const shouldBlock = !forcePreview && (result.binary || (result.byteSize ?? 0) > previewMaxBytes)
 
           setState({
             binary: result.binary,
@@ -701,12 +733,12 @@ export function LocalFilePreview({
     return () => {
       active = false
     }
-  }, [blockedByTarget, filePath, forcePreview, isImage, isText, reloadKey, selfReload, target.dataUrl, target.language])
+  }, [blockedByTarget, filePath, forcePreview, isImage, isText, previewMaxBytes, reloadKey, selfReload, target.dataUrl, target.language])
 
   // Editing is only offered for whole, readable text — never images, binaries,
   // or files we only loaded the first 512 KB of (saving would drop the tail).
   const canEdit =
-    isText && !isImage && !blockedByTarget && state.text !== undefined && !state.truncated && !state.binary
+    !filesMode && isText && !isImage && !blockedByTarget && state.text !== undefined && !state.truncated && !state.binary
 
   // Per-keystroke: update the draft ref (no render) and only set `dirty` when it
   // actually changes — React bails on an identical value, so a long typing run
@@ -895,7 +927,7 @@ export function LocalFilePreview({
   if (
     !isImage &&
     !forcePreview &&
-    (target.binary || target.large || state.binary || (state.byteSize ?? 0) > TEXT_PREVIEW_MAX_BYTES)
+    (target.binary || state.binary || (target.byteSize ?? 0) > previewMaxBytes || (state.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
   ) {
     const binary = target.binary || state.binary
     const size = target.byteSize || state.byteSize
@@ -903,7 +935,7 @@ export function LocalFilePreview({
     return (
       <PreviewEmptyState
         body={binary ? t.preview.binaryBody(target.label) : t.preview.largeBody(target.label, formatBytes(size))}
-        primaryAction={{ label: t.preview.previewAnyway, onClick: () => setForcePreview(true) }}
+        primaryAction={filesMode ? undefined : { label: t.preview.previewAnyway, onClick: () => setForcePreview(true) }}
         title={binary ? t.preview.binaryTitle : t.preview.largeTitle}
         tone="warning"
       />
@@ -923,9 +955,21 @@ export function LocalFilePreview({
     )
   }
 
+  if (isVideo || isAudio) {
+    return (
+      <div className="flex h-full w-full items-center justify-center overflow-auto bg-transparent p-4">
+        {isVideo ? (
+          <video className="max-h-full max-w-full rounded-lg" controls src={target.url} />
+        ) : (
+          <audio className="w-full max-w-xl" controls src={target.url} />
+        )}
+      </div>
+    )
+  }
+
   if (isText && state.text !== undefined) {
     const isMarkdown = (state.language || target.language) === 'markdown'
-    const hasDiff = Boolean(state.diff && state.diff.trim())
+    const hasDiff = !filesMode && Boolean(state.diff && state.diff.trim())
     // Order the toggle reads left→right; default lands on the most useful view.
     const modes: PreviewViewMode[] = []
 
@@ -940,7 +984,7 @@ export function LocalFilePreview({
     }
 
     const autoMode: PreviewViewMode = hasDiff ? 'diff' : isMarkdown && richPreviewEnabled ? 'rendered' : 'source'
-    const mode = userMode && modes.includes(userMode) ? userMode : autoMode
+    const mode = !filesMode && userMode && modes.includes(userMode) ? userMode : autoMode
 
     return (
       <div
@@ -958,24 +1002,26 @@ export function LocalFilePreview({
             {t.preview.truncated}
           </div>
         )}
-        <PreviewModeSwitcher
-          active={mode}
-          modes={modes}
-          onSelect={setUserMode}
-          trailing={
-            canEdit ? (
-              <button
-                className="flex items-center gap-1 text-[0.625rem] font-bold text-muted-foreground underline-offset-4 transition-colors hover:text-foreground"
-                onClick={beginEdit}
-                title={`${t.preview.edit} (e)`}
-                type="button"
-              >
-                <Pencil className="size-3" />
-                {t.preview.edit}
-              </button>
-            ) : null
-          }
-        />
+        {!filesMode && (
+          <PreviewModeSwitcher
+            active={mode}
+            modes={modes}
+            onSelect={setUserMode}
+            trailing={
+              canEdit ? (
+                <button
+                  className="flex items-center gap-1 text-[0.625rem] font-bold text-muted-foreground underline-offset-4 transition-colors hover:text-foreground"
+                  onClick={beginEdit}
+                  title={`${t.preview.edit} (e)`}
+                  type="button"
+                >
+                  <Pencil className="size-3" />
+                  {t.preview.edit}
+                </button>
+              ) : null
+            }
+          />
+        )}
         <div className="min-h-0 flex-1 overflow-auto">
           {mode === 'rendered' ? (
             <MarkdownPreview text={state.text} />
@@ -988,12 +1034,20 @@ export function LocalFilePreview({
               showLineNumbers
             />
           ) : (
-            <SourceView
-              filePath={filePath}
-              language={shikiLanguageForFilename(filePath) || state.language || 'text'}
-              text={state.text}
-              wordWrapEnabled={wordWrapEnabled}
-            />
+            wordWrapEnabled ? (
+              <SourceWrapView
+                filePath={filePath}
+                language={shikiLanguageForFilename(filePath) || state.language || 'text'}
+                text={state.text}
+              />
+            ) : (
+              <SourceView
+                filePath={filePath}
+                language={shikiLanguageForFilename(filePath) || state.language || 'text'}
+                text={state.text}
+                wordWrapEnabled={wordWrapEnabled}
+              />
+            )
           )}
         </div>
       </div>

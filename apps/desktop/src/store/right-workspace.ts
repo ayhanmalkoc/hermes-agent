@@ -18,6 +18,7 @@ export interface RightWorkspaceTab {
   treeVisible?: boolean
   richPreviewEnabled?: boolean
   wordWrapEnabled?: boolean
+  treeFilter?: string
   selectedPath?: string | null
   createdAt: number
   lastActiveAt: number
@@ -88,6 +89,27 @@ function defaultTitle(input: OpenRightWorkspaceTabInput): string {
   return targetTitle(input.target)
 }
 
+function buildRightWorkspaceTab(
+  input: OpenRightWorkspaceTabInput,
+  id: string,
+  timestamp: number,
+  existing?: RightWorkspaceTab
+): RightWorkspaceTab {
+  return {
+    createdAt: existing?.createdAt ?? timestamp,
+    id,
+    kind: input.kind,
+    lastActiveAt: timestamp,
+    richPreviewEnabled: existing?.richPreviewEnabled ?? true,
+    wordWrapEnabled: existing?.wordWrapEnabled ?? true,
+    treeFilter: existing?.treeFilter ?? '',
+    selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
+    target: input.kind === 'files' ? (input.target ?? null) : undefined,
+    title: defaultTitle(input),
+    treeVisible: existing?.treeVisible ?? (input.kind !== 'terminal')
+  }
+}
+
 export function setRightWorkspaceOpen(open: boolean): void {
   setPaneOpen(RIGHT_WORKSPACE_PANE_ID, open)
 }
@@ -97,18 +119,7 @@ export function openRightWorkspaceTab(input: OpenRightWorkspaceTabInput): RightW
   const timestamp = now()
   const current = $rightWorkspaceTabs.get()
   const existing = current.find(tab => tab.id === id)
-  const nextTab: RightWorkspaceTab = {
-    createdAt: existing?.createdAt ?? timestamp,
-    id,
-    kind: input.kind,
-    lastActiveAt: timestamp,
-    richPreviewEnabled: existing?.richPreviewEnabled ?? true,
-    wordWrapEnabled: existing?.wordWrapEnabled ?? true,
-    selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
-    target: input.kind === 'files' ? (input.target ?? null) : undefined,
-    title: defaultTitle(input),
-    treeVisible: existing?.treeVisible ?? (input.kind !== 'terminal')
-  }
+  const nextTab = buildRightWorkspaceTab(input, id, timestamp, existing)
 
   $rightWorkspaceTabs.set(existing ? current.map(tab => (tab.id === id ? { ...tab, ...nextTab } : tab)) : [...current, nextTab])
   $activeRightWorkspaceTabId.set(id)
@@ -161,6 +172,32 @@ export function toggleRightWorkspaceTabTree(id: string): void {
 
 export function openFilesWorkspaceTarget(target: PreviewTarget): RightWorkspaceTab {
   return openRightWorkspaceTab({ kind: 'files', target })
+}
+
+export function openFilesWorkspaceTargetFromTab(sourceTabId: string, target: PreviewTarget): RightWorkspaceTab {
+  const id = filesTabId(target)
+  const timestamp = now()
+  const current = $rightWorkspaceTabs.get()
+  const existing = current.find(tab => tab.id === id)
+
+  if (existing) {
+    const nextTab = buildRightWorkspaceTab({ kind: 'files', target }, id, timestamp, existing)
+    $rightWorkspaceTabs.set(current.map(tab => (tab.id === id ? { ...tab, ...nextTab } : tab)))
+    $activeRightWorkspaceTabId.set(id)
+    setRightWorkspaceOpen(true)
+
+    return nextTab
+  }
+
+  const source = current.find(tab => tab.id === sourceTabId)
+  const shouldReplaceSource = Boolean(source && source.kind === 'files' && !source.target)
+  const nextTab = buildRightWorkspaceTab({ kind: 'files', target }, id, timestamp, source)
+
+  $rightWorkspaceTabs.set(shouldReplaceSource ? current.map(tab => (tab.id === sourceTabId ? nextTab : tab)) : [...current, nextTab])
+  $activeRightWorkspaceTabId.set(id)
+  setRightWorkspaceOpen(true)
+
+  return nextTab
 }
 
 export function openEmptyFilesWorkspace(): RightWorkspaceTab {

@@ -1,6 +1,7 @@
 import { useStore } from '@nanostores/react'
 
 import { PreviewPane } from '@/app/chat/right-rail/preview-pane'
+import { readDesktopFileText } from '@/lib/desktop-fs'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import {
@@ -13,7 +14,12 @@ import { Tip } from '@/components/ui/tooltip'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { cn } from '@/lib/utils'
 import { $currentCwd } from '@/store/session'
-import { toggleRightWorkspaceTabTree, updateRightWorkspaceTab, type RightWorkspaceTab } from '@/store/right-workspace'
+import {
+  openFilesWorkspaceTargetFromTab,
+  toggleRightWorkspaceTabTree,
+  updateRightWorkspaceTab,
+  type RightWorkspaceTab
+} from '@/store/right-workspace'
 
 import { ProjectTree } from '../../right-sidebar/files/tree'
 import { useProjectTree } from '../../right-sidebar/files/use-project-tree'
@@ -35,6 +41,12 @@ async function copyText(value: string): Promise<void> {
   await navigator.clipboard?.writeText(value)
 }
 
+async function copyFileContent(path: string): Promise<void> {
+  const result = await readDesktopFileText(path)
+
+  await copyText(result.text)
+}
+
 function isMarkdownTarget(target: RightWorkspaceTab['target']): boolean {
   if (!target) {
     return false
@@ -47,7 +59,7 @@ function isMarkdownTarget(target: RightWorkspaceTab['target']): boolean {
 }
 
 function supportsWordWrap(target: RightWorkspaceTab['target']): boolean {
-  return Boolean(target && target.previewKind !== 'image' && target.previewKind !== 'binary')
+  return Boolean(target && (target.previewKind === 'text' || target.previewKind === 'html'))
 }
 
 function FilesEmptyState() {
@@ -82,19 +94,22 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
       return
     }
 
-    updateRightWorkspaceTab(tab.id, {
-      selectedPath: path,
-      target: preview,
-      title: path.split(/[\\/]/).filter(Boolean).at(-1) ?? 'Dosya aç'
-    })
+    openFilesWorkspaceTargetFromTab(tab.id, preview)
   }
+
+  const filterText = tab.treeFilter ?? ''
 
   return (
     <div className="flex min-h-0 w-[15rem] shrink-0 flex-col border-l border-(--ui-stroke-quaternary) bg-(--ui-sidebar-surface-background)">
       <div className="p-2">
-        <div className="flex h-8 items-center gap-2 rounded-lg border border-(--ui-stroke-quaternary) bg-(--ui-editor-surface-background) px-2 text-xs text-muted-foreground">
+        <div className="flex h-8 items-center gap-2 rounded-lg border border-(--ui-stroke-quaternary) bg-(--ui-editor-surface-background) px-2 text-xs text-muted-foreground focus-within:border-(--ui-stroke-secondary)">
           <Codicon name="search" size="0.85rem" />
-          Dosyaları filtrele...
+          <input
+            className="min-w-0 flex-1 bg-transparent text-xs text-(--ui-text-primary) outline-none placeholder:text-muted-foreground"
+            onChange={event => updateRightWorkspaceTab(tab.id, { treeFilter: event.target.value })}
+            placeholder="Dosyaları filtrele..."
+            value={filterText}
+          />
         </div>
       </div>
       <ProjectTree
@@ -107,6 +122,7 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
         onNodeOpenChange={setNodeOpen}
         onPreviewFile={path => void previewFile(path)}
         openState={openState}
+        filterText={filterText}
         previewOnSelect
       />
       {rootLoading && <div className="px-3 py-2 text-xs text-muted-foreground">Yükleniyor...</div>}
@@ -138,7 +154,7 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
               <Codicon className="mr-2" name="copy" size="0.875rem" />
               Yolu kopyala
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={!target} onClick={() => target && void copyText(target.source)}>
+            <DropdownMenuItem disabled={!target} onClick={() => target && void copyFileContent(target.source)}>
               <Codicon className="mr-2" name="copy" size="0.875rem" />
               Dosya içeriğini kopyala
             </DropdownMenuItem>
@@ -170,6 +186,7 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
           {target ? (
             <PreviewPane
               embedded
+              filesMode
               richPreviewEnabled={showRichPreviewToggle ? (tab.richPreviewEnabled ?? true) : true}
               target={target}
               wordWrapEnabled={tab.wordWrapEnabled ?? true}

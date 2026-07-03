@@ -1,5 +1,5 @@
 import { useStore } from '@nanostores/react'
-import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useRef, useState } from 'react'
+import { type KeyboardEvent as ReactKeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { type NodeApi, type NodeRendererProps, type RowRendererProps, Tree, type TreeApi } from 'react-arborist'
 
 import { TreeSkeleton } from '@/components/chat/skeletons'
@@ -19,6 +19,33 @@ const ROW_HEIGHT = 22
 const INDENT = 10
 /** Fixed base inset (`px-6.5`) layered on top of arborist's depth indent. */
 const TREE_ROW_INSET = '17px'
+
+function filterTreeNodes(nodes: TreeNode[], query: string, root: string): TreeNode[] {
+  const needle = query.trim().toLowerCase()
+
+  if (!needle) {
+    return nodes
+  }
+
+  const cleanRoot = root.replace(/[\/]+$/, '').toLowerCase()
+
+  return nodes.flatMap(node => {
+    const path = node.id.toLowerCase()
+    const relativePath = path.startsWith(cleanRoot) ? path.slice(cleanRoot.length).replace(/^[\/]+/, '') : path
+    const matches = node.name.toLowerCase().includes(needle) || relativePath.includes(needle)
+    const children = node.children ? filterTreeNodes(node.children, query, root) : undefined
+
+    if (matches) {
+      return [node]
+    }
+
+    if (children?.length) {
+      return [{ ...node, children }]
+    }
+
+    return []
+  })
+}
 
 function withTreeInset(paddingLeft: number | string | undefined): string {
   if (typeof paddingLeft === 'number') {
@@ -42,6 +69,7 @@ interface ProjectTreeProps {
   onNodeOpenChange: (id: string, open: boolean) => void
   onPreviewFile?: (path: string) => void
   openState: Record<string, boolean>
+  filterText?: string
   previewOnSelect?: boolean
 }
 
@@ -55,12 +83,15 @@ export function ProjectTree({
   onNodeOpenChange,
   onPreviewFile,
   openState,
+  filterText = '',
   previewOnSelect = false
 }: ProjectTreeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const treeRef = useRef<TreeApi<TreeNode> | null>(null)
   const [size, setSize] = useState({ height: 0, width: 0 })
   const changeByPath = useStore($repoChangeByPath)
+  const filteredData = useMemo(() => filterTreeNodes(data, filterText, cwd), [cwd, data, filterText])
+  const filtering = Boolean(filterText.trim())
 
   const syncTreeSize = useCallback(() => {
     const el = containerRef.current
@@ -181,7 +212,7 @@ export function ProjectTree({
       {size.height > 0 && size.width > 0 ? (
         <Tree<TreeNode>
           childrenAccessor={node => (node?.isDirectory ? (node.children ?? []) : null)}
-          data={data}
+          data={filteredData}
           disableDrag
           disableDrop
           disableEdit
@@ -189,10 +220,10 @@ export function ProjectTree({
           height={size.height}
           indent={INDENT}
           initialOpenState={openState}
-          key={`${cwd}:${collapseNonce}`}
+          key={`${cwd}:${collapseNonce}:${filterText}`}
           onActivate={handleActivate}
           onToggle={handleToggle}
-          openByDefault={false}
+          openByDefault={filtering}
           padding={0}
           ref={treeRef}
           renderRow={ProjectTreeRowContainer}

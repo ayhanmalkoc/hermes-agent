@@ -3,6 +3,31 @@ import type { PreviewTarget } from '@/store/preview'
 
 const HTML_EXTENSIONS = new Set(['.htm', '.html'])
 const IMAGE_EXTENSIONS = new Set(['.bmp', '.gif', '.jpeg', '.jpg', '.png', '.svg', '.webp'])
+const AUDIO_EXTENSIONS = new Set(['.aac', '.flac', '.m4a', '.mp3', '.ogg', '.opus', '.wav'])
+const VIDEO_EXTENSIONS = new Set(['.avi', '.m4v', '.mov', '.mp4', '.mpeg', '.mpg', '.webm'])
+const UNSUPPORTED_BINARY_EXTENSIONS = new Set([
+  '.7z',
+  '.asar',
+  '.bin',
+  '.db',
+  '.dmg',
+  '.dll',
+  '.doc',
+  '.docx',
+  '.exe',
+  '.gz',
+  '.ico',
+  '.jar',
+  '.msi',
+  '.pdf',
+  '.sqlite',
+  '.tar',
+  '.tgz',
+  '.wasm',
+  '.xls',
+  '.xlsx',
+  '.zip'
+])
 
 const LANGUAGE_BY_EXT: Record<string, string> = {
   '.c': 'c',
@@ -93,6 +118,9 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
   const ext = extension(path)
   const isHtml = HTML_EXTENSIONS.has(ext)
   const isImage = IMAGE_EXTENSIONS.has(ext)
+  const isAudio = AUDIO_EXTENSIONS.has(ext)
+  const isVideo = VIDEO_EXTENSIONS.has(ext)
+  const isUnsupportedBinary = UNSUPPORTED_BINARY_EXTENSIONS.has(ext)
 
   return {
     kind: 'file',
@@ -102,14 +130,15 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
     // Renderer fallback can't stat/sniff without reading; assume text unless
     // image/html extension says otherwise. LocalFilePreview still guards
     // binary/large files when readFileText/readFileDataUrl returns metadata.
-    previewKind: isHtml ? 'html' : isImage ? 'image' : 'text',
+    binary: isUnsupportedBinary,
+    previewKind: isUnsupportedBinary ? 'binary' : isHtml ? 'html' : isImage ? 'image' : isAudio ? 'audio' : isVideo ? 'video' : 'text',
     source: raw,
     url: pathToFileUrl(path)
   }
 }
 
 async function enrichPreviewTarget(target: PreviewTarget | null): Promise<PreviewTarget | null> {
-  if (!isDesktopFsRemoteMode() || !target || target.kind !== 'file' || target.previewKind === 'image') {
+  if (!isDesktopFsRemoteMode() || !target || target.kind !== 'file' || target.previewKind === 'image' || target.previewKind === 'audio' || target.previewKind === 'video') {
     return target
   }
 
