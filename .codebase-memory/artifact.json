@@ -1,0 +1,11 @@
+{
+    "schema_version": 1,
+    "commit": "",
+    "indexed_at": "2026-07-02T17:20:39Z",
+    "project": "C-dev-hermes-agent",
+    "nodes": 89936,
+    "edges": 467479,
+    "original_size": 201588736,
+    "compressed_size": 36039551,
+    "compression_level": 9
+}
