@@ -553,7 +553,15 @@ function SourceView({ filePath, language, text }: { filePath: string; language: 
 
 type PreviewViewMode = 'diff' | 'rendered' | 'source'
 
-export function LocalFilePreview({ reloadKey, target }: { reloadKey: number; target: PreviewTarget }) {
+export function LocalFilePreview({
+  reloadKey,
+  richPreviewEnabled = true,
+  target
+}: {
+  reloadKey: number
+  richPreviewEnabled?: boolean
+  target: PreviewTarget
+}) {
   const { t } = useI18n()
   const [state, setState] = useState<LocalPreviewState>({ loading: true })
   const [forcePreview, setForcePreview] = useState(false)
@@ -590,7 +598,7 @@ export function LocalFilePreview({ reloadKey, target }: { reloadKey: number; tar
     setConflict(false)
     draftRef.current = ''
     baselineRef.current = ''
-  }, [filePath, reloadKey])
+  }, [filePath, reloadKey, richPreviewEnabled])
 
   // HTML files are rendered as source code, not in a webview - so they take
   // the same path as plain text files. `previewKind === 'binary'` arrives
@@ -913,7 +921,7 @@ export function LocalFilePreview({ reloadKey, target }: { reloadKey: number; tar
       modes.push('diff')
     }
 
-    const autoMode: PreviewViewMode = hasDiff ? 'diff' : isMarkdown ? 'rendered' : 'source'
+    const autoMode: PreviewViewMode = hasDiff ? 'diff' : isMarkdown && richPreviewEnabled ? 'rendered' : 'source'
     const mode = userMode && modes.includes(userMode) ? userMode : autoMode
 
     return (

@@ -142,7 +142,7 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       </div>
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className={cn('min-w-0 flex-1 overflow-hidden', !target && 'flex')}>
-          {target ? <PreviewPane embedded target={target} /> : <FilesEmptyState />}
+          {target ? <PreviewPane embedded richPreviewEnabled={tab.richPreviewEnabled ?? true} target={target} /> : <FilesEmptyState />}
         </div>
         {tab.treeVisible && <FilesTreeColumn tab={tab} />}
       </div>

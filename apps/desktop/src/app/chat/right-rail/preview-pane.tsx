@@ -35,6 +35,7 @@ interface PreviewPaneProps {
   embedded?: boolean
   onRestartServer?: (url: string, context?: string) => Promise<string>
   reloadRequest?: number
+  richPreviewEnabled?: boolean
   setTitlebarToolGroup?: SetTitlebarToolGroup
   target: PreviewTarget
 }
@@ -124,6 +125,7 @@ export function PreviewPane({
   embedded = false,
   onRestartServer,
   reloadRequest = 0,
+  richPreviewEnabled = true,
   setTitlebarToolGroup,
   target
 }: PreviewPaneProps) {
@@ -145,7 +147,7 @@ export function PreviewPane({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<PreviewLoadErrorState | null>(null)
   const [localReloadKey, setLocalReloadKey] = useState(0)
-  const isWebPreview = target.kind === 'url' || (target.previewKind === 'html' && target.renderMode !== 'source')
+  const isWebPreview = target.kind === 'url' || (richPreviewEnabled && target.previewKind === 'html' && target.renderMode !== 'source')
   const currentLabel = compactUrl(currentUrl)
 
   const previewLabel =
@@ -633,7 +635,7 @@ export function PreviewPane({
             )}
             ref={hostRef}
           />
-          {!isWebPreview && <LocalFilePreview reloadKey={localReloadKey} target={target} />}
+          {!isWebPreview && <LocalFilePreview reloadKey={localReloadKey} richPreviewEnabled={richPreviewEnabled} target={target} />}
           {loadError && (
             <PreviewLoadError
               consoleHeight={consoleOpen ? consoleHeight : 0}
