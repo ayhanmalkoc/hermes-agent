@@ -2,6 +2,9 @@ import { useStore } from '@nanostores/react'
 import { atom } from 'nanostores'
 import { type CSSProperties, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
+import type { HermesConnection } from '@/global'
+import type { HermesGateway } from '@/hermes'
+
 import { $terminalTakeover } from '../store'
 
 import { ensureTerminal } from './terminals'
@@ -41,6 +44,8 @@ export function TerminalSlot({ className = SLOT_CLASS }: { className?: string })
 }
 
 interface PersistentTerminalProps {
+  connection?: HermesConnection | null
+  gateway?: HermesGateway | null
   onAddSelectionToChat: (text: string, label?: string) => void
 }
 
@@ -54,7 +59,7 @@ interface Rect {
 const sameRect = (a: Rect | null, b: Rect) =>
   !!a && a.top === b.top && a.left === b.left && a.width === b.width && a.height === b.height
 
-export function PersistentTerminal({ onAddSelectionToChat }: PersistentTerminalProps) {
+export function PersistentTerminal({ connection, gateway, onAddSelectionToChat }: PersistentTerminalProps) {
   const slot = useStore($slot)
   const terminalTakeover = useStore($terminalTakeover)
   const [rect, setRect] = useState<Rect | null>(null)
@@ -133,7 +138,7 @@ export function PersistentTerminal({ onAddSelectionToChat }: PersistentTerminalP
   // conhost on Windows. After that `mounted` latches: shells persist while hidden.
   return (
     <div aria-hidden={!visible} style={style}>
-      {mounted && <TerminalWorkspace onAddSelectionToChat={onAddSelectionToChat} />}
+      {mounted && <TerminalWorkspace connection={connection} gateway={gateway} onAddSelectionToChat={onAddSelectionToChat} />}
     </div>
   )
 }

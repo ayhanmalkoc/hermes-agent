@@ -8,7 +8,7 @@ import {
   openTerminalWorkspaceForTerminal,
   selectRightWorkspaceTabForTerminal
 } from '@/store/right-workspace'
-import { $currentCwd } from '@/store/session'
+import { $connection, $currentCwd } from '@/store/session'
 
 import { setTerminalTakeover } from '../store'
 
@@ -52,6 +52,19 @@ interface PersistedTerminalState {
 
 const TERMINALS_STORAGE_KEY = 'hermes.desktop.terminals.v1'
 
+function terminalsStorageKey(): string {
+  const connection = $connection.get()
+
+  if (connection?.mode !== 'remote') {
+    return TERMINALS_STORAGE_KEY
+  }
+
+  const base = encodeURIComponent(connection.baseUrl || 'remote')
+  const profile = encodeURIComponent(connection.profile || 'default')
+
+  return `${TERMINALS_STORAGE_KEY}.remote.${base}.${profile}`
+}
+
 // Cap a single tab's replayed history so the persisted layout can't blow the
 // localStorage quota. Roughly mirrors VS Code's persistentSessionScrollback
 // default (100 lines) once the serialized escape codes are counted in.
@@ -83,7 +96,7 @@ function sanitizePersistedTerminal(value: unknown): PersistedTerminalEntry | nul
 
 function loadPersistedTerminals(): PersistedTerminalState {
   const fallback: PersistedTerminalState = { activeTerminalId: null, terminals: [] }
-  const raw = readKey(TERMINALS_STORAGE_KEY)
+  const raw = readKey(terminalsStorageKey())
 
   if (!raw) {
     return fallback
@@ -128,13 +141,13 @@ function persistTerminals(list: readonly TerminalEntry[], activeTerminalId: null
     }))
 
   if (!terminals.length) {
-    writeKey(TERMINALS_STORAGE_KEY, null)
+    writeKey(terminalsStorageKey(), null)
 
     return
   }
 
   const active = terminals.some(term => term.id === activeTerminalId) ? activeTerminalId : (terminals[0]?.id ?? null)
-  writeKey(TERMINALS_STORAGE_KEY, JSON.stringify({ activeTerminalId: active, terminals }))
+  writeKey(terminalsStorageKey(), JSON.stringify({ activeTerminalId: active, terminals }))
 }
 
 const restored = loadPersistedTerminals()

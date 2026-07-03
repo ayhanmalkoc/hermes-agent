@@ -8,11 +8,13 @@ import json
 import logging
 import os
 import queue
+import shlex
 import subprocess
 import sys
 import threading
 import time
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -8112,6 +8114,139 @@ def _(rid, params: dict) -> dict:
     session["cols"] = int(params.get("cols", 80))
     return _ok(rid, {"cols": session["cols"]})
 
+
+
+
+@dataclass
+class _DesktopTerminalSession:
+    process: Any
+    transport: Transport
+
+
+_desktop_terminal_lock = threading.Lock()
+_desktop_terminal_sessions: dict[str, _DesktopTerminalSession] = {}
+
+
+def _desktop_terminal_shell() -> tuple[list[str], str]:
+    raw = (os.environ.get("SHELL") or "").strip()
+    argv = shlex.split(raw) if raw else []
+    if not argv:
+        argv = ["/bin/bash" if os.path.exists("/bin/bash") else "/bin/sh"]
+    return argv, os.path.basename(argv[0]) or "shell"
+
+
+def _desktop_terminal_cwd(raw: Any) -> str:
+    cwd = str(raw or "").strip()
+    if not cwd:
+        return os.getcwd()
+    resolved = os.path.abspath(os.path.expanduser(cwd))
+    if not os.path.isdir(resolved):
+        raise FileNotFoundError(f"terminal cwd not found: {cwd}")
+    return resolved
+
+
+def _desktop_terminal_emit(transport: Transport, event: str, terminal_id: str, payload: dict | None = None) -> None:
+    params = {"type": event, "session_id": terminal_id, "payload": {"id": terminal_id, **(payload or {})}}
+    try:
+        transport.write({"jsonrpc": "2.0", "method": "event", "params": params})
+    except Exception:
+        pass
+
+
+def _desktop_terminal_reader(terminal_id: str, transport: Transport) -> None:
+    while True:
+        with _desktop_terminal_lock:
+            session = _desktop_terminal_sessions.get(terminal_id)
+        if session is None:
+            return
+        try:
+            data = session.process.read(4096)
+        except EOFError:
+            break
+        except Exception as exc:
+            _desktop_terminal_emit(transport, "desktop_terminal.exit", terminal_id, {"error": str(exc)})
+            break
+        if data:
+            _desktop_terminal_emit(transport, "desktop_terminal.data", terminal_id, {"data": data})
+
+    with _desktop_terminal_lock:
+        session = _desktop_terminal_sessions.pop(terminal_id, None)
+    exit_code = None
+    if session is not None:
+        try:
+            exit_code = session.process.wait()
+        except Exception:
+            exit_code = None
+    _desktop_terminal_emit(transport, "desktop_terminal.exit", terminal_id, {"exitCode": exit_code})
+
+
+@method("desktop_terminal.start")
+def _(rid, params: dict) -> dict:
+    transport = current_transport()
+    if transport is None:
+        return _err(rid, 5004, "desktop terminal requires an active gateway transport")
+    if sys.platform == "win32":
+        return _err(rid, 5005, "remote desktop terminal is not supported on Windows backends yet")
+    try:
+        from ptyprocess import PtyProcessUnicode
+
+        argv, shell_name = _desktop_terminal_shell()
+        cwd = _desktop_terminal_cwd(params.get("cwd"))
+        cols = max(2, int(params.get("cols") or 80))
+        rows = max(2, int(params.get("rows") or 24))
+        env = hermes_subprocess_env()
+        process = PtyProcessUnicode.spawn(argv, cwd=cwd, env=env, dimensions=(rows, cols))
+        terminal_id = uuid.uuid4().hex
+        with _desktop_terminal_lock:
+            _desktop_terminal_sessions[terminal_id] = _DesktopTerminalSession(process=process, transport=transport)
+        threading.Thread(target=_desktop_terminal_reader, args=(terminal_id, transport), daemon=True).start()
+        return _ok(rid, {"id": terminal_id, "shell": shell_name})
+    except Exception as exc:
+        return _err(rid, 5006, f"desktop terminal start failed: {exc}")
+
+
+@method("desktop_terminal.write")
+def _(rid, params: dict) -> dict:
+    terminal_id = str(params.get("id") or "")
+    with _desktop_terminal_lock:
+        session = _desktop_terminal_sessions.get(terminal_id)
+    if session is None:
+        return _err(rid, 4040, "desktop terminal not found")
+    try:
+        session.process.write(str(params.get("data") or ""))
+        return _ok(rid, {"ok": True})
+    except Exception as exc:
+        return _err(rid, 5007, f"desktop terminal write failed: {exc}")
+
+
+@method("desktop_terminal.resize")
+def _(rid, params: dict) -> dict:
+    terminal_id = str(params.get("id") or "")
+    with _desktop_terminal_lock:
+        session = _desktop_terminal_sessions.get(terminal_id)
+    if session is None:
+        return _err(rid, 4040, "desktop terminal not found")
+    try:
+        cols = max(2, int(params.get("cols") or 80))
+        rows = max(2, int(params.get("rows") or 24))
+        session.process.setwinsize(rows, cols)
+        return _ok(rid, {"cols": cols, "rows": rows})
+    except Exception as exc:
+        return _err(rid, 5008, f"desktop terminal resize failed: {exc}")
+
+
+@method("desktop_terminal.dispose")
+def _(rid, params: dict) -> dict:
+    terminal_id = str(params.get("id") or "")
+    with _desktop_terminal_lock:
+        session = _desktop_terminal_sessions.pop(terminal_id, None)
+    if session is None:
+        return _ok(rid, {"ok": False})
+    try:
+        session.process.terminate(force=True)
+    except Exception:
+        pass
+    return _ok(rid, {"ok": True})
 
 # ── Methods: prompt ──────────────────────────────────────────────────
 

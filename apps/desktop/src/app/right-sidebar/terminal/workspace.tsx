@@ -1,6 +1,8 @@
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
+import type { HermesConnection } from '@/global'
+import type { HermesGateway } from '@/hermes'
 import { $backgroundStatusBySession } from '@/store/composer-status'
 
 import { seedAgentTerminalCommand, syncAgentTerminalSnapshot } from './agent-terminal-stream'
@@ -9,6 +11,8 @@ import { AgentTerminalInstance, TerminalInstance } from './instance'
 import { $activeTerminalId, $terminals, ensureAgentTerminal } from './terminals'
 
 interface TerminalWorkspaceProps {
+  connection?: HermesConnection | null
+  gateway?: HermesGateway | null
   onAddSelectionToChat: (text: string, label?: string) => void
 }
 
@@ -16,7 +20,7 @@ interface TerminalWorkspaceProps {
  *  must stay in the fixed overlay, for the WebGL host). Mount/visibility is owned
  *  by PersistentTerminal (latched so shells survive hiding); terminal tabs live
  *  in the right-workspace header. */
-export function TerminalWorkspace({ onAddSelectionToChat }: TerminalWorkspaceProps) {
+export function TerminalWorkspace({ connection, gateway, onAddSelectionToChat }: TerminalWorkspaceProps) {
   const terminals = useStore($terminals)
   const activeId = useStore($activeTerminalId)
   const background = useStore($backgroundStatusBySession)
@@ -52,7 +56,9 @@ export function TerminalWorkspace({ onAddSelectionToChat }: TerminalWorkspacePro
         ) : (
           <TerminalInstance
             active={term.id === activeId}
+            connection={connection}
             cwd={term.cwd}
+            gateway={gateway}
             id={term.id}
             key={term.id}
             onAddSelectionToChat={onAddSelectionToChat}

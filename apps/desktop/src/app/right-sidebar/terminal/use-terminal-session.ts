@@ -13,6 +13,7 @@ import { useTheme } from '@/themes/context'
 
 import { $terminalInjection } from '../store'
 
+import type { TerminalApi } from './api'
 import { makeTerminalReader, registerTerminalReader } from './buffer'
 import {
   isAddSelectionShortcut,
@@ -204,6 +205,7 @@ interface UseTerminalSessionOptions {
   /** Renderer-side terminal id (the tab handle), used to key the agent reader. */
   id: string
   cwd: string
+  terminalApi: TerminalApi | null
   /** Only the active tab is visible, owns the agent reader, and runs injections. */
   active: boolean
   onAddSelectionToChat: (text: string, label?: string) => void
@@ -312,6 +314,7 @@ function quotePathForShell(path: string, shellName: string): string {
 export function useTerminalSession({
   id,
   cwd,
+  terminalApi,
   active,
   onAddSelectionToChat,
   reviveBuffer,
@@ -408,7 +411,6 @@ export function useTerminalSession({
 
   useEffect(() => {
     const host = hostRef.current
-    const terminalApi = window.hermesDesktop?.terminal
 
     if (!host || !terminalApi) {
       setStatus('closed')
@@ -773,7 +775,7 @@ export function useTerminalSession({
     // `id` is stable for the instance's life (keyed by tab id), so listing it
     // doesn't re-create the shell — it just satisfies the deps check for the
     // closeTerminal(id) call in onExit.
-  }, [addSelectionToChat, cwd, id])
+  }, [addSelectionToChat, cwd, id, terminalApi])
 
   useEffect(() => {
     const term = termRef.current
@@ -846,11 +848,11 @@ export function useTerminalSession({
         return
       }
 
-      void window.hermesDesktop?.terminal?.write(sessionId, `${command}\r`)
+      void terminalApi?.write(sessionId, `${command}\r`)
       $terminalInjection.set(null)
       termRef.current?.focus()
     })
-  }, [active, status])
+  }, [active, status, terminalApi])
 
   return {
     addSelectionToChat,

@@ -5,6 +5,7 @@ const STORAGE_KEY = 'hermes.desktop.terminals.v1'
 
 async function loadTerminalStore() {
   vi.doMock('@/store/session', () => ({
+    $connection: atom(null),
     $currentCwd: atom('/workspace')
   }))
 

@@ -922,7 +922,13 @@ export function DesktopController() {
   // layer) so pane resize handles still paint above it. Terminals own their state
   // (incl. a snapshotted cwd) independent of the session, so switching sessions
   // never rebuilds or closes them; toggling the pane never rebuilds the shells.
-  const mainOverlays = <PersistentTerminal onAddSelectionToChat={composer.addTerminalSelectionAttachment} />
+  const mainOverlays = (
+    <PersistentTerminal
+      connection={connectionRef.current}
+      gateway={gatewayRef.current}
+      onAddSelectionToChat={composer.addTerminalSelectionAttachment}
+    />
+  )
 
   const overlays = (
     <>

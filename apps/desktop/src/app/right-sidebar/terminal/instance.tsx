@@ -1,11 +1,16 @@
 import '@xterm/xterm/css/xterm.css'
 
+import { useMemo } from 'react'
+
 import { Button } from '@/components/ui/button'
 import { KbdCombo } from '@/components/ui/kbd'
 import { Loader } from '@/components/ui/loader'
+import type { HermesConnection } from '@/global'
+import type { HermesGateway } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
 
+import { terminalApiForConnection } from './api'
 import { reportTerminalShell } from './terminals'
 import { useAgentTerminal } from './use-agent-terminal'
 import { useTerminalSession } from './use-terminal-session'
@@ -18,18 +23,26 @@ interface TerminalInstanceProps {
   id: string
   cwd: string
   active: boolean
+  connection?: HermesConnection | null
+  gateway?: HermesGateway | null
   onAddSelectionToChat: (text: string, label?: string) => void
   reviveBuffer?: string
 }
 
 /** One persistent xterm+PTY. Every open tab stays mounted (so its shell and
  *  scrollback survive tab switches); only the active one is shown. */
-export function TerminalInstance({ id, active, cwd, onAddSelectionToChat, reviveBuffer }: TerminalInstanceProps) {
+export function TerminalInstance({ id, active, connection, cwd, gateway, onAddSelectionToChat, reviveBuffer }: TerminalInstanceProps) {
   const { t } = useI18n()
+
+  const terminalApi = useMemo(
+    () => terminalApiForConnection(connection, gateway),
+    [connection, gateway]
+  )
 
   const { addSelectionToChat, hostRef, selection, selectionStyle, status } = useTerminalSession({
     id,
     cwd,
+    terminalApi,
     active,
     onAddSelectionToChat,
     reviveBuffer,
