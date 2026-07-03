@@ -1404,6 +1404,7 @@ export const ja = defineLocale({
     kindImage: '画像',
     kindFile: 'ファイル',
     kindLink: 'リンク',
+    preview: 'プレビュー',
     chat: 'チャット',
     copyUrl: 'URL をコピー',
     copyPath: 'パスをコピー'

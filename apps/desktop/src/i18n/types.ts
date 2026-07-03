@@ -1047,6 +1047,7 @@ export interface Translations {
     kindImage: string
     kindFile: string
     kindLink: string
+    preview: string
     chat: string
     copyUrl: string
     copyPath: string

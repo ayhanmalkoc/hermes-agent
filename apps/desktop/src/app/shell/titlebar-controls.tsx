@@ -11,13 +11,13 @@ import { cn } from '@/lib/utils'
 import { $hapticsMuted, toggleHapticsMuted } from '@/store/haptics'
 import { toggleKeybindPanel } from '@/store/keybinds'
 import {
-  $fileBrowserOpen,
   $panesFlipped,
   $sidebarOpen,
-  toggleFileBrowserOpen,
   togglePanesFlipped,
   toggleSidebarOpen
 } from '@/store/layout'
+import { $paneOpen } from '@/store/panes'
+import { RIGHT_WORKSPACE_PANE_ID, toggleRightWorkspaceOpen } from '@/store/right-workspace'
 
 import { appViewForPath, isOverlayView } from '../routes'
 
@@ -51,7 +51,7 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
   const navigate = useNavigate()
   const location = useLocation()
   const hapticsMuted = useStore($hapticsMuted)
-  const fileBrowserOpen = useStore($fileBrowserOpen)
+  const rightWorkspaceOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const sidebarOpen = useStore($sidebarOpen)
   const panesFlipped = useStore($panesFlipped)
 
@@ -67,14 +67,12 @@ export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }:
     }
   }
 
-  // Each titlebar button controls the pane physically on its side, so a flip
-  // swaps which pane each one toggles. Default: sessions left, file browser
-  // right. Flipped: file browser left, sessions right. Sidebar toggles never
-  // carry an active highlight — they're plain show/hide affordances.
-  const fileBrowserEdge = { open: fileBrowserOpen, toggle: toggleFileBrowserOpen }
+  // Each titlebar button controls the pane physically on its side. The right edge
+  // now owns the unified RightWorkspace surface.
   const sessionsEdge = { open: sidebarOpen, toggle: toggleSidebarOpen }
-  const leftEdge = panesFlipped ? fileBrowserEdge : sessionsEdge
-  const rightEdge = panesFlipped ? sessionsEdge : fileBrowserEdge
+  const rightWorkspaceEdge = { open: rightWorkspaceOpen, toggle: toggleRightWorkspaceOpen }
+  const leftEdge = sessionsEdge
+  const rightEdge = panesFlipped ? sessionsEdge : rightWorkspaceEdge
 
   const leftToolbarTools: TitlebarTool[] = [
     {
@@ -245,3 +243,4 @@ function TitlebarToolButton({ navigate, tool }: { navigate: ReturnType<typeof us
     </Tip>
   )
 }
+

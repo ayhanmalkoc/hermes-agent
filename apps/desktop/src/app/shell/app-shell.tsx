@@ -8,14 +8,12 @@ import { FloatingPet } from '@/components/pet/floating-pet'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { useMediaQuery } from '@/hooks/use-media-query'
 import {
-  $fileBrowserOpen,
   $panesFlipped,
   $sidebarOpen,
-  FILE_BROWSER_DEFAULT_WIDTH,
-  FILE_BROWSER_PANE_ID,
   setSidebarOpen
 } from '@/store/layout'
-import { $paneWidthOverride } from '@/store/panes'
+import { $paneOpen, $paneWidthOverride } from '@/store/panes'
+import { RIGHT_WORKSPACE_PANE_ID } from '@/store/right-workspace'
 import { $connection } from '@/store/session'
 import { isSecondaryWindow } from '@/store/windows'
 
@@ -75,10 +73,10 @@ export function AppShell({
   titlebarTools
 }: AppShellProps) {
   const sidebarOpen = useStore($sidebarOpen)
-  const fileBrowserOpen = useStore($fileBrowserOpen)
+  const rightWorkspaceOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const panesFlipped = useStore($panesFlipped)
   const narrowViewport = useMediaQuery(SIDEBAR_COLLAPSE_MEDIA_QUERY)
-  const fileBrowserWidthOverride = useStore($paneWidthOverride(FILE_BROWSER_PANE_ID))
+  const rightWorkspaceWidthOverride = useStore($paneWidthOverride(RIGHT_WORKSPACE_PANE_ID))
   const connection = useStore($connection)
   const viewportFullscreen = useSyncExternalStore(subscribeWindowSize, viewportIsFullscreen, () => false)
   const isFullscreen = Boolean(connection?.isFullscreen) || viewportFullscreen
@@ -113,7 +111,7 @@ export function AppShell({
   // hover-reveal overlay (0px track) below the collapse breakpoint, so the edge
   // is uncovered there regardless of their stored open state. A standalone
   // session window renders no sidebar at all, so its edge is always uncovered.
-  const collapsibleLeftPaneOpen = panesFlipped ? fileBrowserOpen : sidebarOpen
+  const collapsibleLeftPaneOpen = sidebarOpen
   // The terminal + preview rails never force-collapse, so when they're the
   // leftmost open pane (flipped layout) they cover the edge even when narrow.
   const persistentLeftPaneOpen = panesFlipped && (terminalPaneOpen || previewPaneOpen)
@@ -138,15 +136,14 @@ export function AppShell({
   const paneToolCount = titlebarTools?.filter(tool => !tool.hidden).length ?? 0
   const systemToolsWidth = `calc(${SYSTEM_TOOL_COUNT} * (var(--titlebar-control-size) + 0.25rem))`
 
-  const fileBrowserWidth =
-    fileBrowserWidthOverride !== undefined ? `${fileBrowserWidthOverride}px` : FILE_BROWSER_DEFAULT_WIDTH
+  const rightWorkspaceWidth =
+    rightWorkspaceWidthOverride !== undefined ? `${rightWorkspaceWidthOverride}px` : '34rem'
 
   // Where the pane-tool cluster's right edge sits, measured from the inner
   // titlebar padding (--titlebar-tools-right). Two anchors:
-  //   - file-browser closed → flush against static cluster's left edge
-  //   - file-browser open   → flush against the file-browser pane's left edge
-  //                           (= preview pane's right edge)
-  const previewToolbarGap = fileBrowserOpen ? fileBrowserWidth : systemToolsWidth
+  //   - right workspace closed -> flush against static cluster's left edge
+  //   - right workspace open   -> flush against the workspace pane's left edge
+  const previewToolbarGap = rightWorkspaceOpen ? rightWorkspaceWidth : systemToolsWidth
 
   // Used by the drag region to know where the rightmost interactive element
   // ends. When pane tools are present, that's `gap + paneCount * controlSize
@@ -235,3 +232,4 @@ export function AppShell({
     </SidebarProvider>
   )
 }
+

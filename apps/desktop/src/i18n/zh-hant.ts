@@ -1357,6 +1357,7 @@ export const zhHant = defineLocale({
     kindImage: '圖片',
     kindFile: '檔案',
     kindLink: '連結',
+    preview: '預覽',
     chat: '聊天',
     copyUrl: '複製 URL',
     copyPath: '複製路徑'

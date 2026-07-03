@@ -12,10 +12,7 @@ import { toggleCommandPalette } from '@/store/command-palette'
 import { $capture, $comboIndex, endCapture, setBinding, toggleKeybindPanel } from '@/store/keybinds'
 import {
   CHAT_SIDEBAR_PANE_ID,
-  FILE_BROWSER_PANE_ID,
   requestSessionSearchFocus,
-  setFileBrowserOpen,
-  toggleFileBrowserOpen,
   togglePanesFlipped,
   toggleSidebarOpen
 } from '@/store/layout'
@@ -28,6 +25,7 @@ import {
   toggleShowAllProfiles
 } from '@/store/profile'
 import { requestNewWorktree } from '@/store/projects'
+import { openEmptyFilesWorkspace, toggleRightWorkspaceOpen } from '@/store/right-workspace'
 import { toggleReview } from '@/store/review'
 import { setModelPickerOpen } from '@/store/session'
 import {
@@ -109,7 +107,7 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
   }
 
   const showFiles = () => {
-    setFileBrowserOpen(true)
+    openEmptyFilesWorkspace()
     setTerminalTakeover(false)
   }
 
@@ -157,9 +155,9 @@ export function useKeybinds(deps: KeybindRuntimeDeps): void {
     },
     'view.toggleRightSidebar': () => {
       if (matchesQuery(SIDEBAR_COLLAPSE_MEDIA_QUERY)) {
-        window.dispatchEvent(new CustomEvent(PANE_TOGGLE_REVEAL_EVENT, { detail: { id: FILE_BROWSER_PANE_ID } }))
+        toggleRightWorkspaceOpen()
       } else {
-        toggleFileBrowserOpen()
+        toggleRightWorkspaceOpen()
       }
     },
     'view.toggleReview': toggleReview,

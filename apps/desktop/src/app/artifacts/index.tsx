@@ -24,9 +24,11 @@ import { type Translations, useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
 import { ExternalLink, ExternalLinkIcon, hostPathLabel, urlSlugTitleLabel, useLinkTitle } from '@/lib/external-link'
 import { FileImage, FileText, FolderOpen, Link2 } from '@/lib/icons'
-import { mediaExternalUrl } from '@/lib/media'
+import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
+import { isRemoteGateway, mediaExternalUrl } from '@/lib/media'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
+import { setCurrentSessionPreviewTarget } from '@/store/preview'
 import type { SessionInfo, SessionMessage } from '@/types/hermes'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
@@ -37,15 +39,18 @@ import { sessionRoute } from '../routes'
 import type { SetStatusbarItemGroup } from '../shell/statusbar-controls'
 
 type ArtifactKind = 'image' | 'file' | 'link'
+type ArtifactLocation = 'local' | 'remote' | 'url'
 type ArtifactFilter = 'all' | ArtifactKind
 const ARTIFACT_FILTERS: readonly ArtifactFilter[] = ['all', 'image', 'file', 'link']
 
 interface ArtifactRecord {
   id: string
   kind: ArtifactKind
+  location: ArtifactLocation
   value: string
   href: string
   label: string
+  cwd?: string | null
   sessionId: string
   sessionTitle: string
   timestamp: number
@@ -125,16 +130,42 @@ function artifactKind(value: string): ArtifactKind {
   return 'link'
 }
 
-function artifactHref(value: string): string {
+function artifactLocation(value: string): ArtifactLocation {
+  if (/^https?:/i.test(value) || value.startsWith('data:')) {
+    return 'url'
+  }
+
+  if (value.startsWith('file://') || /^[a-z]:[\\/]/i.test(value)) {
+    return isRemoteGateway() ? 'remote' : 'local'
+  }
+
+  return isRemoteGateway() ? 'remote' : 'local'
+}
+
+function artifactTarget(value: string, cwd?: string | null): string {
+  if (!cwd || value.startsWith('/') || value.startsWith('~/') || value.startsWith('file://') || /^[a-z]:[\\/]/i.test(value)) {
+    return value
+  }
+
+  if (value.startsWith('./') || value.startsWith('../')) {
+    return `${cwd.replace(/\/+$/, '')}/${value.replace(/^\.\//, '')}`
+  }
+
+  return value
+}
+
+function artifactHref(value: string, cwd?: string | null): string {
   if (value.startsWith('http://') || value.startsWith('https://') || value.startsWith('data:')) {
     return value
   }
 
-  if (value.startsWith('file://') || value.startsWith('/')) {
-    return mediaExternalUrl(value)
+  const target = artifactTarget(value, cwd)
+
+  if (target.startsWith('file://') || target.startsWith('/') || /^[a-z]:[\\/]/i.test(target)) {
+    return mediaExternalUrl(target)
   }
 
-  return value
+  return target
 }
 
 function artifactLabel(value: string): string {
@@ -293,9 +324,11 @@ export function collectArtifactsForSession(session: SessionInfo, messages: Sessi
       found.set(key, {
         id: key,
         kind: artifactKind(value),
+        location: artifactLocation(value),
         value,
-        href: artifactHref(value),
+        href: artifactHref(value, session.cwd),
         label: artifactLabel(value),
+        cwd: session.cwd,
         sessionId: session.id,
         sessionTitle: title,
         timestamp: message.timestamp || session.last_active || session.started_at || Date.now()
@@ -348,7 +381,7 @@ function paginationItems(page: number, pageCount: number): Array<number | 'ellip
 }
 
 type CellCtx = {
-  onOpen: (href: string) => void | Promise<void>
+  onOpen: (artifact: ArtifactRecord) => void | Promise<void>
   onOpenChat: (sessionId: string) => void
 }
 
@@ -478,19 +511,40 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
     }
   }, [artifacts])
 
-  const openArtifact = useCallback(
+  const openExternalArtifact = useCallback(
     async (href: string) => {
+      if (window.hermesDesktop?.openExternal) {
+        await window.hermesDesktop.openExternal(href)
+      } else {
+        window.open(href, '_blank', 'noopener,noreferrer')
+      }
+    },
+    []
+  )
+
+  const openArtifact = useCallback(
+    async (artifact: ArtifactRecord) => {
       try {
-        if (window.hermesDesktop?.openExternal) {
-          await window.hermesDesktop.openExternal(href)
-        } else {
-          window.open(href, '_blank', 'noopener,noreferrer')
+        if (artifact.kind === 'link') {
+          await openExternalArtifact(artifact.href)
+
+          return
         }
+
+        const target = await normalizeOrLocalPreviewTarget(artifact.value, artifact.cwd || undefined)
+
+        if (target) {
+          setCurrentSessionPreviewTarget(target, 'manual', artifact.value)
+
+          return
+        }
+
+        await openExternalArtifact(artifact.href)
       } catch (err) {
         notifyError(err, a.openFailed)
       }
     },
-    [a]
+    [a, openExternalArtifact]
   )
 
   const markImageFailed = useCallback((id: string) => {
@@ -583,6 +637,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
                       failedImage={failedImageIds.has(artifact.id)}
                       key={artifact.id}
                       onImageError={markImageFailed}
+                      onOpen={() => void openArtifact(artifact)}
                       onOpenChat={sessionId => navigate(sessionRoute(sessionId))}
                     />
                   ))}
@@ -677,10 +732,11 @@ interface ArtifactImageCardProps {
   artifact: ArtifactRecord
   failedImage: boolean
   onImageError: (id: string) => void
+  onOpen: () => void
   onOpenChat: (sessionId: string) => void
 }
 
-function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: ArtifactImageCardProps) {
+function ArtifactImageCard({ artifact, failedImage, onImageError, onOpen, onOpenChat }: ArtifactImageCardProps) {
   const { t } = useI18n()
   const a = t.artifacts
   const kindLabel = artifact.kind === 'image' ? a.kindImage : artifact.kind === 'file' ? a.kindFile : a.kindLink
@@ -712,6 +768,7 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: 
           <div className="mb-0.5 flex items-center gap-1 text-[0.625rem] uppercase tracking-[0.08em] text-(--ui-text-tertiary)">
             <FileImage className="size-3" />
             {kindLabel}
+            <span className="rounded bg-(--ui-bg-tertiary) px-1 py-0.5 text-[0.55rem]">{artifact.location}</span>
           </div>
           <div className="truncate text-[length:var(--conversation-caption-font-size)] font-medium">
             {artifact.label}
@@ -724,6 +781,10 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpenChat }: 
         </div>
 
         <div className="flex flex-wrap gap-1.5">
+          <Button onClick={onOpen} size="xs" type="button" variant="textStrong">
+            <FileImage className="size-3" />
+            {a.preview}
+          </Button>
           <Button onClick={() => onOpenChat(artifact.sessionId)} size="xs" type="button" variant="textStrong">
             <FolderOpen className="size-3" />
             {a.chat}
@@ -780,7 +841,7 @@ function PrimaryCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx
   return (
     <ArtifactCellAction
       href={isLink ? artifact.href : undefined}
-      onClick={isLink ? undefined : () => void ctx.onOpen(artifact.href)}
+      onClick={isLink ? undefined : () => void ctx.onOpen(artifact)}
       title={label}
     >
       <span className="mt-0.5 grid size-6 shrink-0 place-items-center self-start rounded-md bg-(--ui-bg-tertiary) text-(--ui-text-tertiary)">
@@ -789,6 +850,11 @@ function PrimaryCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx
       <span className={cn('min-w-0 flex-1', isLink ? 'wrap-anywhere' : 'truncate')}>
         {label}
         {isLink && <ExternalLinkIcon />}
+        {!isLink && (
+          <span className="ml-1 rounded bg-(--ui-bg-tertiary) px-1 py-0.5 text-[0.55rem] uppercase text-(--ui-text-tertiary)">
+            {artifact.location}
+          </span>
+        )}
       </span>
     </ArtifactCellAction>
   )

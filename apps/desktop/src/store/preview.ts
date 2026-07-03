@@ -10,6 +10,7 @@ import {
   selectRightRailTab
 } from './layout'
 import { setPaneOpen } from './panes'
+import { openFilesWorkspaceTarget } from './right-workspace'
 import { $activeSessionId, $selectedStoredSessionId } from './session'
 
 export interface PreviewTarget {
@@ -150,8 +151,7 @@ function openFilePreviewTarget(target: PreviewTarget) {
   const tab: FilePreviewTab = { id, target }
 
   $filePreviewTabs.set(index === -1 ? [...current, tab] : current.map((item, i) => (i === index ? tab : item)))
-  setPaneOpen(PREVIEW_PANE_ID, true)
-  selectRightRailTab(id)
+  openFilesWorkspaceTarget(target)
 }
 
 // Manual/file-browser opens are "peeking at a file" → source view in the file

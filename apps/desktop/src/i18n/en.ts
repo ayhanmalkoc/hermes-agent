@@ -1296,6 +1296,7 @@ export const en: Translations = {
     kindImage: 'image',
     kindFile: 'file',
     kindLink: 'link',
+    preview: 'Preview',
     chat: 'Chat',
     copyUrl: 'Copy URL',
     copyPath: 'Copy path'

@@ -1476,6 +1476,7 @@ export const zh: Translations = {
     kindImage: '图片',
     kindFile: '文件',
     kindLink: '链接',
+    preview: '预览',
     chat: '对话',
     copyUrl: '复制 URL',
     copyPath: '复制路径'
