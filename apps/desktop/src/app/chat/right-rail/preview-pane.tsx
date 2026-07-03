@@ -37,6 +37,7 @@ interface PreviewPaneProps {
   reloadRequest?: number
   richPreviewEnabled?: boolean
   setTitlebarToolGroup?: SetTitlebarToolGroup
+  wordWrapEnabled?: boolean
   target: PreviewTarget
 }
 
@@ -127,7 +128,8 @@ export function PreviewPane({
   reloadRequest = 0,
   richPreviewEnabled = true,
   setTitlebarToolGroup,
-  target
+  target,
+  wordWrapEnabled = true
 }: PreviewPaneProps) {
   const { t } = useI18n()
   const copy = t.preview.web
@@ -147,7 +149,7 @@ export function PreviewPane({
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<PreviewLoadErrorState | null>(null)
   const [localReloadKey, setLocalReloadKey] = useState(0)
-  const isWebPreview = target.kind === 'url' || (richPreviewEnabled && target.previewKind === 'html' && target.renderMode !== 'source')
+  const isWebPreview = target.kind === 'url' || (target.previewKind === 'html' && target.renderMode !== 'source')
   const currentLabel = compactUrl(currentUrl)
 
   const previewLabel =
@@ -635,7 +637,14 @@ export function PreviewPane({
             )}
             ref={hostRef}
           />
-          {!isWebPreview && <LocalFilePreview reloadKey={localReloadKey} richPreviewEnabled={richPreviewEnabled} target={target} />}
+          {!isWebPreview && (
+            <LocalFilePreview
+              reloadKey={localReloadKey}
+              richPreviewEnabled={richPreviewEnabled}
+              target={target}
+              wordWrapEnabled={wordWrapEnabled}
+            />
+          )}
           {loadError && (
             <PreviewLoadError
               consoleHeight={consoleOpen ? consoleHeight : 0}

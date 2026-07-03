@@ -431,7 +431,17 @@ function startLineDrag(event: ReactDragEvent<HTMLElement>, filePath: string, { e
   event.dataTransfer.effectAllowed = 'copy'
 }
 
-function SourceView({ filePath, language, text }: { filePath: string; language: string; text: string }) {
+function SourceView({
+  filePath,
+  language,
+  text,
+  wordWrapEnabled = true
+}: {
+  filePath: string
+  language: string
+  text: string
+  wordWrapEnabled?: boolean
+}) {
   const { t } = useI18n()
   const chunks = useMemo(() => chunkTextLines(text, SOURCE_CHUNK_LINES), [text])
   const lastChunk = chunks.at(-1)
@@ -530,7 +540,13 @@ function SourceView({ filePath, language, text }: { filePath: string; language: 
                 )
               })}
             </div>
-            <div className="preview-source-code min-w-0 [&_pre]:m-0" data-selectable-text="true">
+            <div
+              className={cn(
+                'preview-source-code min-w-0 [&_pre]:m-0',
+                wordWrapEnabled && '[&_code]:whitespace-pre-wrap [&_pre]:whitespace-pre-wrap [&_pre]:break-words'
+              )}
+              data-selectable-text="true"
+            >
               <ShikiHighlighter
                 addDefaultStyles={false}
                 as="div"
@@ -556,11 +572,13 @@ type PreviewViewMode = 'diff' | 'rendered' | 'source'
 export function LocalFilePreview({
   reloadKey,
   richPreviewEnabled = true,
-  target
+  target,
+  wordWrapEnabled = true
 }: {
   reloadKey: number
   richPreviewEnabled?: boolean
   target: PreviewTarget
+  wordWrapEnabled?: boolean
 }) {
   const { t } = useI18n()
   const [state, setState] = useState<LocalPreviewState>({ loading: true })
@@ -974,6 +992,7 @@ export function LocalFilePreview({
               filePath={filePath}
               language={shikiLanguageForFilename(filePath) || state.language || 'text'}
               text={state.text}
+              wordWrapEnabled={wordWrapEnabled}
             />
           )}
         </div>

@@ -17,6 +17,7 @@ export interface RightWorkspaceTab {
   target?: PreviewTarget | null
   treeVisible?: boolean
   richPreviewEnabled?: boolean
+  wordWrapEnabled?: boolean
   selectedPath?: string | null
   createdAt: number
   lastActiveAt: number
@@ -102,6 +103,7 @@ export function openRightWorkspaceTab(input: OpenRightWorkspaceTabInput): RightW
     kind: input.kind,
     lastActiveAt: timestamp,
     richPreviewEnabled: existing?.richPreviewEnabled ?? true,
+    wordWrapEnabled: existing?.wordWrapEnabled ?? true,
     selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
     target: input.kind === 'files' ? (input.target ?? null) : undefined,
     title: defaultTitle(input),

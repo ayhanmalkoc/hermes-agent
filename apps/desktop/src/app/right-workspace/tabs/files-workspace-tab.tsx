@@ -35,6 +35,21 @@ async function copyText(value: string): Promise<void> {
   await navigator.clipboard?.writeText(value)
 }
 
+function isMarkdownTarget(target: RightWorkspaceTab['target']): boolean {
+  if (!target) {
+    return false
+  }
+
+  const language = target.language?.toLowerCase()
+  const source = target.source.toLowerCase()
+
+  return language === 'markdown' || source.endsWith('.md') || source.endsWith('.markdown')
+}
+
+function supportsWordWrap(target: RightWorkspaceTab['target']): boolean {
+  return Boolean(target && target.previewKind !== 'image' && target.previewKind !== 'binary')
+}
+
 function FilesEmptyState() {
   return (
     <div className="grid min-h-0 flex-1 place-items-center p-8 text-center">
@@ -103,6 +118,8 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   const currentCwd = useStore($currentCwd).trim()
   const target = tab.target ?? null
   const breadcrumb = breadcrumbFor(currentCwd, tab.selectedPath ?? target?.source)
+  const showRichPreviewToggle = isMarkdownTarget(target)
+  const showWordWrapToggle = supportsWordWrap(target)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -125,10 +142,18 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
               <Codicon className="mr-2" name="copy" size="0.875rem" />
               Dosya içeriğini kopyala
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { richPreviewEnabled: !tab.richPreviewEnabled })}>
-              <Codicon className="mr-2" name="code" size="0.875rem" />
-              {tab.richPreviewEnabled ? 'Zengin görünümü devre dışı bırak' : 'Zengin görünümü etkinleştir'}
-            </DropdownMenuItem>
+            {showRichPreviewToggle && (
+              <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { richPreviewEnabled: !tab.richPreviewEnabled })}>
+                <Codicon className="mr-2" name="code" size="0.875rem" />
+                {tab.richPreviewEnabled ? 'Zengin görünümü devre dışı bırak' : 'Zengin görünümü etkinleştir'}
+              </DropdownMenuItem>
+            )}
+            {showWordWrapToggle && (
+              <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { wordWrapEnabled: !tab.wordWrapEnabled })}>
+                <Codicon className="mr-2" name="word-wrap" size="0.875rem" />
+                {tab.wordWrapEnabled ?? true ? 'Satır kaydırmayı devre dışı bırak' : 'Satır kaydırmayı etkinleştir'}
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
         <Button disabled={!target} size="xs" variant="secondary">
@@ -142,7 +167,16 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       </div>
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className={cn('min-w-0 flex-1 overflow-hidden', !target && 'flex')}>
-          {target ? <PreviewPane embedded richPreviewEnabled={tab.richPreviewEnabled ?? true} target={target} /> : <FilesEmptyState />}
+          {target ? (
+            <PreviewPane
+              embedded
+              richPreviewEnabled={showRichPreviewToggle ? (tab.richPreviewEnabled ?? true) : true}
+              target={target}
+              wordWrapEnabled={tab.wordWrapEnabled ?? true}
+            />
+          ) : (
+            <FilesEmptyState />
+          )}
         </div>
         {tab.treeVisible && <FilesTreeColumn tab={tab} />}
       </div>
