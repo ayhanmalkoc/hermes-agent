@@ -34,9 +34,44 @@ describe('terminal store persistence', () => {
 
     expect($activeTerminalId.get()).toBe('term-two')
     expect($terminals.get()).toEqual([
-      { auto: false, cwd: '/repo/one', id: 'term-one', kind: 'user', reviveBuffer: 'last output', title: 'zsh' },
-      { auto: true, cwd: '/repo/two', id: 'term-two', kind: 'user', title: 'Terminal' }
+      { auto: false, cwd: '/repo/one', id: 'term-one', kind: 'user', reviveBuffer: 'last output', scopeKey: 'global', title: 'zsh' },
+      { auto: true, cwd: '/repo/two', id: 'term-two', kind: 'user', scopeKey: 'global', title: 'Terminal' }
     ])
+  })
+
+  it('persists terminals independently per session scope without dropping live tabs', async () => {
+    const { $activeTerminalId, $terminals, createTerminal, setTerminalScope } = await loadTerminalStore()
+
+    setTerminalScope('session-a')
+    const firstId = createTerminal('/repo/a')
+    setTerminalScope('session-b')
+    const secondId = createTerminal('/repo/b')
+
+    expect($activeTerminalId.get()).toBe(secondId)
+    expect($terminals.get().map(term => [term.id, term.scopeKey])).toEqual([
+      [firstId, 'session-a'],
+      [secondId, 'session-b']
+    ])
+    expect(window.localStorage.getItem(`${STORAGE_KEY}.scope.session-a`)).toContain('/repo/a')
+    expect(window.localStorage.getItem(`${STORAGE_KEY}.scope.session-b`)).toContain('/repo/b')
+
+    setTerminalScope('session-a')
+
+    expect($activeTerminalId.get()).toBe(firstId)
+  })
+
+  it('promotes draft terminals to the first real session scope', async () => {
+    const { $activeTerminalId, $terminals, createTerminal, setTerminalScope } = await loadTerminalStore()
+
+    setTerminalScope('draft:local:/repo')
+    const id = createTerminal('/repo')
+
+    setTerminalScope('session-real')
+
+    expect($activeTerminalId.get()).toBe(id)
+    expect($terminals.get()).toMatchObject([{ id, scopeKey: 'session-real' }])
+    expect(window.localStorage.getItem(`${STORAGE_KEY}.scope.${encodeURIComponent('draft:local:/repo')}`)).toBeNull()
+    expect(window.localStorage.getItem(`${STORAGE_KEY}.scope.session-real`)).toContain('/repo')
   })
 
   it('persists user tabs and history synchronously, skipping agent mirrors', async () => {

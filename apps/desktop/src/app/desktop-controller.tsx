@@ -37,9 +37,10 @@ import {
   $rightWorkspaceTabs,
   closeActiveRightWorkspaceTab,
   openReviewWorkspace,
-  RIGHT_WORKSPACE_PANE_ID
+  RIGHT_WORKSPACE_PANE_ID,
+  setRightWorkspaceScope
 } from '../store/right-workspace'
-import { showTerminalWorkspace } from './right-sidebar/terminal/terminals'
+import { setTerminalScope, showTerminalWorkspace } from './right-sidebar/terminal/terminals'
 import { $paneOpen } from '../store/panes'
 import { setPetActivity } from '../store/pet'
 import { setPetScale } from '../store/pet-gallery'
@@ -58,6 +59,7 @@ import { $startWorkSessionRequest, followActiveSessionCwd, resolveNewSessionCwd 
 import { $reviewOpen } from '../store/review'
 import {
   $activeSessionId,
+  $connection,
   $attentionSessionIds,
   $currentCwd,
   $freshDraftReady,
@@ -152,6 +154,7 @@ export function DesktopController() {
 
   const gatewayState = useStore($gatewayState)
   const activeSessionId = useStore($activeSessionId)
+  const connection = useStore($connection)
   const currentCwd = useStore($currentCwd)
   const freshDraftReady = useStore($freshDraftReady)
   const resumeFailedSessionId = useStore($resumeFailedSessionId)
@@ -171,8 +174,31 @@ export function DesktopController() {
   const narrowViewport = useMediaQuery(SIDEBAR_COLLAPSE_MEDIA_QUERY)
 
   const routedSessionId = routeSessionId(location.pathname)
+  const rightWorkspaceScopeKey = useMemo(() => {
+    if (selectedStoredSessionId) {
+      return selectedStoredSessionId
+    }
+
+    if (activeSessionId) {
+      return activeSessionId
+    }
+
+    const connectionKey = connection?.mode === 'remote'
+      ? `remote:${connection.baseUrl || 'remote'}:${connection.profile || 'default'}`
+      : 'local'
+    const cwdKey = currentCwd || 'default'
+
+    return `draft:${connectionKey}:${cwdKey}`
+  }, [activeSessionId, connection?.baseUrl, connection?.mode, connection?.profile, currentCwd, selectedStoredSessionId])
   const routeToken = `${location.pathname}:${location.search}:${location.hash}`
   const routeTokenRef = useRef(routeToken)
+
+  useEffect(() => {
+    const migrateFromScope = selectedStoredSessionId ? activeSessionId : null
+
+    setRightWorkspaceScope(rightWorkspaceScopeKey, { migrateFromScope })
+    setTerminalScope(rightWorkspaceScopeKey, { migrateFromScope })
+  }, [activeSessionId, rightWorkspaceScopeKey, selectedStoredSessionId])
   routeTokenRef.current = routeToken
   const getRouteToken = useCallback(() => routeTokenRef.current, [])
 

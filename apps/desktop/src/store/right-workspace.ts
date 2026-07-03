@@ -1,5 +1,7 @@
 import { atom, computed } from 'nanostores'
 
+import { readKey, writeKey } from '@/lib/storage'
+
 import type { PreviewTarget } from './preview'
 import { ensurePaneRegistered, setPaneOpen, togglePane } from './panes'
 
@@ -40,6 +42,129 @@ export const $activeRightWorkspaceTab = computed(
   [$rightWorkspaceTabs, $activeRightWorkspaceTabId],
   (tabs, activeId) => tabs.find(tab => tab.id === activeId) ?? null
 )
+
+interface RightWorkspaceSnapshot {
+  activeTabId: string | null
+  sizeMode: RightWorkspaceSizeMode
+  tabs: RightWorkspaceTab[]
+}
+
+const RIGHT_WORKSPACE_STORAGE_KEY = 'hermes.desktop.rightWorkspace.v1'
+const DEFAULT_SCOPE_KEY = 'global'
+
+let activeScopeKey = DEFAULT_SCOPE_KEY
+let applyingSnapshot = false
+
+function snapshot(): RightWorkspaceSnapshot {
+  const tabs = $rightWorkspaceTabs.get()
+  const activeTabId = $activeRightWorkspaceTabId.get()
+
+  return {
+    activeTabId: activeTabId && tabs.some(tab => tab.id === activeTabId) ? activeTabId : (tabs.at(-1)?.id ?? null),
+    sizeMode: $rightWorkspaceSizeMode.get(),
+    tabs
+  }
+}
+
+function storageKey(scopeKey = activeScopeKey): string {
+  return `${RIGHT_WORKSPACE_STORAGE_KEY}.${encodeURIComponent(scopeKey || DEFAULT_SCOPE_KEY)}`
+}
+
+function persistSnapshot(scopeKey = activeScopeKey): void {
+  const next = snapshot()
+
+  if (!next.tabs.length && next.sizeMode === 'normal') {
+    writeKey(storageKey(scopeKey), null)
+    return
+  }
+
+  writeKey(storageKey(scopeKey), JSON.stringify(next))
+}
+
+function isRightWorkspaceTab(value: unknown): value is RightWorkspaceTab {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const record = value as Record<string, unknown>
+
+  return (
+    typeof record.id === 'string' &&
+    (record.kind === 'files' || record.kind === 'review' || record.kind === 'terminal') &&
+    typeof record.title === 'string' &&
+    typeof record.createdAt === 'number' &&
+    typeof record.lastActiveAt === 'number'
+  )
+}
+
+function loadSnapshot(scopeKey: string): RightWorkspaceSnapshot {
+  const raw = readKey(storageKey(scopeKey))
+
+  if (!raw) {
+    return { activeTabId: null, sizeMode: 'normal', tabs: [] }
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const tabs = Array.isArray(parsed.tabs) ? parsed.tabs.filter(isRightWorkspaceTab) : []
+    const activeTabId =
+      typeof parsed.activeTabId === 'string' && tabs.some(tab => tab.id === parsed.activeTabId)
+        ? parsed.activeTabId
+        : (tabs.at(-1)?.id ?? null)
+    const sizeMode = parsed.sizeMode === 'expanded' ? 'expanded' : 'normal'
+
+    return { activeTabId, sizeMode, tabs }
+  } catch {
+    return { activeTabId: null, sizeMode: 'normal', tabs: [] }
+  }
+}
+
+function applySnapshot(next: RightWorkspaceSnapshot): void {
+  applyingSnapshot = true
+  $rightWorkspaceTabs.set(next.tabs)
+  $activeRightWorkspaceTabId.set(next.activeTabId)
+  $rightWorkspaceSizeMode.set(next.sizeMode)
+  applyingSnapshot = false
+}
+
+function persistActiveSnapshot(): void {
+  if (!applyingSnapshot) {
+    persistSnapshot()
+  }
+}
+
+$rightWorkspaceTabs.subscribe(persistActiveSnapshot)
+$activeRightWorkspaceTabId.subscribe(persistActiveSnapshot)
+$rightWorkspaceSizeMode.subscribe(persistActiveSnapshot)
+
+export function setRightWorkspaceScope(scopeKey: string, options: { migrateFromScope?: string | null } = {}): void {
+  const nextScopeKey = scopeKey || DEFAULT_SCOPE_KEY
+
+  if (nextScopeKey === activeScopeKey) {
+    return
+  }
+
+  const previousScopeKey = activeScopeKey
+  const previousSnapshot = snapshot()
+
+  persistSnapshot(previousScopeKey)
+  activeScopeKey = nextScopeKey
+
+  const next = loadSnapshot(nextScopeKey)
+  const shouldMigratePrevious =
+    !next.tabs.length &&
+    !nextScopeKey.startsWith('draft:') &&
+    (previousScopeKey.startsWith('draft:') || previousScopeKey === options.migrateFromScope)
+
+  if (shouldMigratePrevious) {
+    applySnapshot(previousSnapshot)
+    persistSnapshot(nextScopeKey)
+    writeKey(storageKey(previousScopeKey), null)
+    return
+  }
+
+  applySnapshot(next)
+}
 
 function now(): number {
   return Date.now()

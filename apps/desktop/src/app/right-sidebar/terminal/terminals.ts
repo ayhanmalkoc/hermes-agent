@@ -23,9 +23,11 @@ export interface TerminalEntry {
   auto: boolean
   /** Working directory, snapshotted once at creation. Terminals live outside
    *  session/project state — the only thing they inherit is this initial cwd
-   *  (the project root if opened in one, else the backend's default). Switching
-   *  sessions never moves or recreates a terminal. */
+   *  (the project root if opened in one, else the backend's default). */
   cwd: string
+  /** Conversation/right-workspace owner. Hidden sessions stay mounted so their
+   *  PTYs survive session switches; this key gates visibility and persistence. */
+  scopeKey: string
   /** Serialized xterm scrollback from the last session, replayed on relaunch so
    *  the tab reopens with its recent history (VS Code parity). Processes are NOT
    *  revived — a fresh shell starts beneath the restored buffer. Captured live
@@ -51,18 +53,22 @@ interface PersistedTerminalState {
 }
 
 const TERMINALS_STORAGE_KEY = 'hermes.desktop.terminals.v1'
+const DEFAULT_SCOPE_KEY = 'global'
 
-function terminalsStorageKey(): string {
+let activeScopeKey = DEFAULT_SCOPE_KEY
+
+function terminalsStorageKey(scopeKey = activeScopeKey): string {
   const connection = $connection.get()
+  const scope = encodeURIComponent(scopeKey || DEFAULT_SCOPE_KEY)
 
   if (connection?.mode !== 'remote') {
-    return TERMINALS_STORAGE_KEY
+    return scopeKey === DEFAULT_SCOPE_KEY ? TERMINALS_STORAGE_KEY : `${TERMINALS_STORAGE_KEY}.scope.${scope}`
   }
 
   const base = encodeURIComponent(connection.baseUrl || 'remote')
   const profile = encodeURIComponent(connection.profile || 'default')
 
-  return `${TERMINALS_STORAGE_KEY}.remote.${base}.${profile}`
+  return `${TERMINALS_STORAGE_KEY}.remote.${base}.${profile}.scope.${scope}`
 }
 
 // Cap a single tab's replayed history so the persisted layout can't blow the
@@ -129,9 +135,9 @@ function loadPersistedTerminals(): PersistedTerminalState {
 // Persist synchronously on every change (the app-wide convention — see panes.ts
 // / layout.ts). Capturing history this way means a snapshot is already on disk
 // well before the renderer tears down, so app quit needs no unload hook.
-function persistTerminals(list: readonly TerminalEntry[], activeTerminalId: null | string) {
+function persistTerminals(list: readonly TerminalEntry[], activeTerminalId: null | string, scopeKey = activeScopeKey) {
   const terminals = list
-    .filter(term => term.kind === 'user')
+    .filter(term => term.kind === 'user' && term.scopeKey === scopeKey)
     .map(term => ({
       auto: term.auto,
       cwd: term.cwd,
@@ -141,24 +147,78 @@ function persistTerminals(list: readonly TerminalEntry[], activeTerminalId: null
     }))
 
   if (!terminals.length) {
-    writeKey(terminalsStorageKey(), null)
+    writeKey(terminalsStorageKey(scopeKey), null)
 
     return
   }
 
   const active = terminals.some(term => term.id === activeTerminalId) ? activeTerminalId : (terminals[0]?.id ?? null)
-  writeKey(terminalsStorageKey(), JSON.stringify({ activeTerminalId: active, terminals }))
+  writeKey(terminalsStorageKey(scopeKey), JSON.stringify({ activeTerminalId: active, terminals }))
 }
 
 const restored = loadPersistedTerminals()
 
 export const $terminals = atom<readonly TerminalEntry[]>(
-  restored.terminals.map(term => ({ ...term, kind: 'user' as const }))
+  restored.terminals.map(term => ({ ...term, kind: 'user' as const, scopeKey: activeScopeKey }))
 )
 export const $activeTerminalId = atom<string | null>(restored.activeTerminalId)
 
 $terminals.subscribe(list => persistTerminals(list, $activeTerminalId.get()))
 $activeTerminalId.subscribe(active => persistTerminals($terminals.get(), active))
+
+function scopeTerminals(scopeKey = activeScopeKey): readonly TerminalEntry[] {
+  return $terminals.get().filter(term => term.scopeKey === scopeKey || term.kind === 'agent')
+}
+
+function scopeActiveTerminal(scopeKey = activeScopeKey): string | null {
+  const scoped = scopeTerminals(scopeKey).filter(term => term.kind === 'user')
+  const active = $activeTerminalId.get()
+
+  return active && scoped.some(term => term.id === active) ? active : (scoped[0]?.id ?? null)
+}
+
+export function setTerminalScope(scopeKey: string, options: { migrateFromScope?: string | null } = {}): void {
+  const nextScopeKey = scopeKey || DEFAULT_SCOPE_KEY
+
+  if (nextScopeKey === activeScopeKey) {
+    return
+  }
+
+  const previousScopeKey = activeScopeKey
+  persistTerminals($terminals.get(), $activeTerminalId.get(), previousScopeKey)
+  activeScopeKey = nextScopeKey
+
+  const restoredForScope = loadPersistedTerminals()
+  const shouldMigratePrevious =
+    !restoredForScope.terminals.length &&
+    !nextScopeKey.startsWith('draft:') &&
+    (previousScopeKey.startsWith('draft:') || previousScopeKey === options.migrateFromScope)
+
+  if (shouldMigratePrevious) {
+    let migratedActive = $activeTerminalId.get()
+    $terminals.set(
+      $terminals.get().map(term => (term.scopeKey === previousScopeKey ? { ...term, scopeKey: nextScopeKey } : term))
+    )
+    if (!migratedActive || !$terminals.get().some(term => term.id === migratedActive && term.scopeKey === nextScopeKey)) {
+      migratedActive = scopeActiveTerminal(nextScopeKey)
+    }
+    $activeTerminalId.set(migratedActive)
+    persistTerminals($terminals.get(), migratedActive, nextScopeKey)
+    writeKey(terminalsStorageKey(previousScopeKey), null)
+    return
+  }
+
+  const existingIds = new Set($terminals.get().map(term => term.id))
+  const restoredEntries = restoredForScope.terminals
+    .filter(term => !existingIds.has(term.id))
+    .map(term => ({ ...term, kind: 'user' as const, scopeKey: nextScopeKey }))
+
+  if (restoredEntries.length) {
+    $terminals.set([...$terminals.get(), ...restoredEntries])
+  }
+
+  $activeTerminalId.set(restoredForScope.activeTerminalId ?? scopeActiveTerminal(nextScopeKey))
+}
 
 export const $activeTerminal = computed(
   [$terminals, $activeTerminalId],
@@ -172,7 +232,7 @@ const newId = () =>
  *  tie to session/project state); pass an explicit cwd to override. Returns the id. */
 export function createTerminal(cwd: string = $currentCwd.get()): string {
   const id = newId()
-  $terminals.set([...$terminals.get(), { id, title: 'Terminal', auto: true, cwd, kind: 'user' }])
+  $terminals.set([...$terminals.get(), { id, title: 'Terminal', auto: true, cwd, kind: 'user', scopeKey: activeScopeKey }])
   $activeTerminalId.set(id)
 
   return id
@@ -188,8 +248,8 @@ export function createAndOpenTerminal(cwd?: string): string {
 }
 
 export function showTerminalWorkspace(): string {
-  const list = $terminals.get()
-  const id = $activeTerminalId.get() ?? list[0]?.id ?? createTerminal()
+  const list = scopeTerminals().filter(term => term.kind === 'user')
+  const id = scopeActiveTerminal() ?? list[0]?.id ?? createTerminal()
   const title = $terminals.get().find(term => term.id === id)?.title
 
   openTerminalWorkspaceForTerminal(id, title)
@@ -220,7 +280,7 @@ export function ensureAgentTerminal(procId: string, title: string): string | nul
 
   surfacedProcs.add(procId)
   const id = newId()
-  $terminals.set([...$terminals.get(), { id, title: title || 'agent', auto: false, cwd: '', kind: 'agent', procId }])
+  $terminals.set([...$terminals.get(), { id, title: title || 'agent', auto: false, cwd: '', kind: 'agent', procId, scopeKey: activeScopeKey }])
   openTerminalWorkspaceForTerminal(id, title || 'agent', false)
 
   return id
@@ -235,7 +295,7 @@ export function openAgentTerminal(procId: string, title: string): void {
 
   if (!id) {
     id = newId()
-    $terminals.set([...$terminals.get(), { id, title: title || 'agent', auto: false, cwd: '', kind: 'agent', procId }])
+    $terminals.set([...$terminals.get(), { id, title: title || 'agent', auto: false, cwd: '', kind: 'agent', procId, scopeKey: activeScopeKey }])
   }
 
   $activeTerminalId.set(id)
@@ -247,14 +307,14 @@ export function openAgentTerminal(procId: string, title: string): void {
  *  If a status-stack click already opened an agent tab, don't create a
  *  second, unrelated user shell just because the pane became visible. */
 export function ensureTerminal(): void {
-  if ($terminals.get().length === 0) {
+  if (scopeTerminals().filter(term => term.kind === 'user').length === 0) {
     const id = createTerminal()
     openTerminalWorkspaceForTerminal(id)
   }
 }
 
 export function selectTerminal(id: string): void {
-  if ($terminals.get().some(term => term.id === id)) {
+  if (scopeTerminals().some(term => term.id === id)) {
     $activeTerminalId.set(id)
     selectRightWorkspaceTabForTerminal(id)
   }
@@ -262,7 +322,7 @@ export function selectTerminal(id: string): void {
 
 /** Move the active tab by `direction` (+1 next / -1 prev), wrapping around. */
 export function cycleTerminal(direction: 1 | -1): void {
-  const list = $terminals.get()
+  const list = scopeTerminals().filter(term => term.kind === 'user')
 
   if (list.length < 2) {
     return
@@ -331,21 +391,24 @@ export function closeActiveTerminal(): void {
 }
 
 export function closeAllTerminals(): void {
-  if ($terminals.get().length === 0) {
+  const scoped = scopeTerminals().filter(term => term.kind === 'user')
+
+  if (scoped.length === 0) {
     return
   }
 
-  $terminals.set([])
+  const scopedIds = new Set(scoped.map(term => term.id))
+  $terminals.set($terminals.get().filter(term => !scopedIds.has(term.id)))
   $activeTerminalId.set(null)
   closeAllRightWorkspaceTerminalTabs()
   setTerminalTakeover(false)
 }
 
 export function closeOtherTerminals(id: string): void {
-  const keep = $terminals.get().find(term => term.id === id)
+  const keep = scopeTerminals().find(term => term.id === id)
 
   if (keep) {
-    $terminals.set([keep])
+    $terminals.set($terminals.get().filter(term => term.scopeKey !== activeScopeKey || term.id === keep.id))
     $activeTerminalId.set(keep.id)
     closeOtherRightWorkspaceTerminalTabs(keep.id)
     selectRightWorkspaceTabForTerminal(keep.id)
