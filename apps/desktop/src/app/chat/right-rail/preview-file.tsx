@@ -572,7 +572,7 @@ function SourceView({
 function SourceWrapView({ filePath, language, text }: { filePath: string; language: string; text: string }) {
   return (
     <div className="h-full overflow-auto bg-transparent" data-selectable-text="true">
-      <div className="preview-source-code min-w-0 whitespace-pre-wrap break-words p-3 font-mono text-[0.7rem] leading-relaxed [&_code]:whitespace-pre-wrap [&_pre]:m-0 [&_pre]:whitespace-pre-wrap [&_pre]:break-words">
+      <div className="preview-source-wrap min-w-0 whitespace-pre-wrap break-words p-3 font-mono text-[0.7rem] leading-relaxed">
         <ShikiHighlighter
           addDefaultStyles={false}
           as="div"

@@ -1345,6 +1345,29 @@ text-* variant utilities. */ .btn-arc {
   white-space: pre;
 }
 
+.preview-source-wrap .shiki,
+.preview-source-wrap .shiki code {
+  margin: 0;
+  background: transparent !important;
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere;
+}
+
+.preview-source-wrap .shiki code {
+  display: block;
+  min-width: 0;
+}
+
+.preview-source-wrap .shiki code .line {
+  display: inline;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.preview-source-wrap .shiki code .line:empty::before {
+  content: '\00a0';
+}
+
 /* The github-dark token palette reads candy-bright at our small code size.
    `github-dark-dimmed` only dims the *background* (which we strip), so soften
    the token *foregrounds* directly — a small saturation + brightness pullback,
