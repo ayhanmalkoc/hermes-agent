@@ -21,7 +21,7 @@ const readFileDataUrl = vi.fn(async () => 'data:text/plain;base64,bG9jYWw=')
 const gitRoot = vi.fn(async () => '/local')
 const selectPaths = vi.fn(async () => ['/local'])
 
-const api = vi.fn(async ({ path }: { path: string }) => {
+async function defaultApi({ path }: { path: string }) {
   if (path.startsWith('/api/fs/list?')) {
     return { entries: [{ name: 'remote', path: '/remote', isDirectory: true }] }
   }
@@ -51,7 +51,9 @@ const api = vi.fn(async ({ path }: { path: string }) => {
   }
 
   throw new Error(`unexpected path ${path}`)
-})
+}
+
+const api = vi.fn(defaultApi)
 
 function stubBridge() {
   vi.stubGlobal('window', {
@@ -69,6 +71,7 @@ function stubBridge() {
 
 describe('desktop filesystem facade', () => {
   beforeEach(() => {
+    api.mockImplementation(defaultApi)
     stubBridge()
     $connection.set(null)
   })
@@ -124,6 +127,21 @@ describe('desktop filesystem facade', () => {
     expect(readFileText).not.toHaveBeenCalled()
     expect(readFileDataUrl).not.toHaveBeenCalled()
     expect(gitRoot).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a clear stale-backend error when remote mkdir is unavailable', async () => {
+    $connection.set({ mode: 'remote' } as never)
+    api.mockImplementation(async request => {
+      if (request.path === '/api/fs/mkdir') {
+        throw new Error('405: {"detail":"Method Not Allowed"}')
+      }
+
+      return { ok: true, path: '/remote/new-project' }
+    })
+
+    await expect(createDesktopDir('/home/user/project/new-project')).rejects.toThrow(
+      'Remote Hermes backend does not support folder creation yet'
+    )
   })
 
   it('targets the active profile backend so a remote profile never reads local disk', async () => {

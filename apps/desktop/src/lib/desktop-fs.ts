@@ -66,6 +66,12 @@ function remoteFsApi<T>(path: string, body?: Record<string, unknown>): Promise<T
   )
 }
 
+function isMissingRemoteMkdirEndpoint(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return /\b(404|405)\b/.test(message) && /\/api\/fs\/mkdir|Method Not Allowed|Not Found/i.test(message)
+}
+
 export async function readDesktopDir(path: string): Promise<HermesReadDirResult> {
   if (!isDesktopFsRemoteMode()) {
     return bridge().readDir(path)
@@ -85,7 +91,19 @@ export async function createDesktopDir(path: string): Promise<{ path: string }> 
     return desktop.createDir(path)
   }
 
-  const result = await remoteFsApi<{ ok?: boolean; path?: string }>('/api/fs/mkdir', { path })
+  let result: { ok?: boolean; path?: string }
+
+  try {
+    result = await remoteFsApi<{ ok?: boolean; path?: string }>('/api/fs/mkdir', { path })
+  } catch (error) {
+    if (isMissingRemoteMkdirEndpoint(error)) {
+      throw new Error(
+        'Remote Hermes backend does not support folder creation yet. Update/restart the remote gateway, or choose an existing folder with Add folder.'
+      )
+    }
+
+    throw error
+  }
 
   return { path: result.path || path }
 }
