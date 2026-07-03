@@ -2,7 +2,7 @@ import { atom } from 'nanostores'
 
 import { liveSessionProjectId, type SidebarProjectTree } from '@/app/chat/sidebar/projects/workspace-groups'
 import type { HermesGitBranch } from '@/global'
-import { desktopDefaultCwd, selectDesktopPaths, writeDesktopFileText } from '@/lib/desktop-fs'
+import { createDesktopDir, desktopDefaultCwd, readDesktopDir, selectDesktopPaths, writeDesktopFileText } from '@/lib/desktop-fs'
 import { desktopGit } from '@/lib/desktop-git'
 import { isMissingRpcMethod } from '@/lib/gateway-rpc'
 import { persistentAtom } from '@/lib/persisted'
@@ -11,7 +11,13 @@ import { activeGateway, ensureActiveGatewayOpen } from '@/store/gateway'
 import { notify } from '@/store/notifications'
 import { setSidebarAgentsGrouped } from '@/store/layout'
 import { requestFreshSession } from '@/store/profile'
-import { $selectedStoredSessionId, $sessions, workspaceCwdForNewSession } from '@/store/session'
+import {
+  $selectedStoredSessionId,
+  $sessions,
+  getConfiguredDefaultProjectDir,
+  syncConfiguredDefaultProjectDir,
+  workspaceCwdForNewSession
+} from '@/store/session'
 import type { ProjectInfo, ProjectsPayload } from '@/types/hermes'
 
 // First-class, per-profile Projects (named, multi-folder workspaces). State is
@@ -433,6 +439,77 @@ function projectInfoToTreeNode(project: ProjectInfo): SidebarProjectTree {
     sessionCount: 0,
     previewSessions: []
   }
+}
+
+function slugProjectName(name: string): string {
+  const normalized = name
+    .trim()
+    .toLowerCase()
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ı/g, 'i')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-{2,}/g, '-')
+
+  return normalized || 'untitled-project'
+}
+
+function joinProjectPath(base: string, leaf: string): string {
+  const cleanBase = base.trim().replace(/[\\/]+$/, '')
+  const separator = /^[A-Za-z]:[\\/]/.test(cleanBase) || cleanBase.includes('\\') ? '\\' : '/'
+
+  return cleanBase ? `${cleanBase}${separator}${leaf}` : leaf
+}
+
+function autoProjectFolderError(name: string, cause: unknown): Error {
+  const detail = cause instanceof Error ? cause.message : String(cause)
+
+  return new Error(`Could not create project folder for ${name}: ${detail}`)
+}
+
+export async function createDefaultProjectFolder(projectName: string): Promise<string> {
+  await syncConfiguredDefaultProjectDir()
+  const base =
+    (await desktopDefaultCwd())?.cwd?.trim() || getConfiguredDefaultProjectDir().trim() || workspaceCwdForNewSession().trim()
+
+  if (!base) {
+    throw new Error('No workspace folder is configured')
+  }
+
+  const slug = slugProjectName(projectName)
+
+  for (let index = 1; index <= 50; index += 1) {
+    const leaf = index === 1 ? slug : `${slug}-${index}`
+    const target = joinProjectPath(base, leaf)
+
+    try {
+      const existing = await readDesktopDir(target).catch(() => null)
+
+      if (existing && !existing.error) {
+        continue
+      }
+
+      const created = await createDesktopDir(target)
+
+      return created.path || target
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+
+      if (/exists|already/i.test(message)) {
+        continue
+      }
+
+      throw autoProjectFolderError(projectName, error)
+    }
+  }
+
+  throw new Error(`Could not create project folder for ${projectName}: too many name collisions`)
 }
 
 export async function createProject(input: CreateProjectInput): Promise<ProjectInfo | null> {

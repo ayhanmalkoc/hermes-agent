@@ -6969,6 +6969,36 @@ ipcMain.handle('hermes:fs:rename', async (_event, targetPath, newName) => {
   return { path: dst }
 })
 
+// Create one project/workspace directory. The requested path is hardened and
+// the parent must already exist; existing directories are success, existing
+// files fail. This is intentionally not a recursive mkdir primitive.
+ipcMain.handle('hermes:fs:createDir', async (_event, dirPath) => {
+  const raw = String(dirPath || '').trim()
+
+  if (!raw) {
+    throw new Error('Invalid directory')
+  }
+
+  const resolved = resolveRequestedPathForIpc(expandUserPath(raw), { purpose: 'Create directory' })
+  const parent = path.dirname(resolved)
+
+  if (!directoryExists(parent)) {
+    throw new Error('Parent directory does not exist')
+  }
+
+  if (directoryExists(resolved)) {
+    return { path: resolved }
+  }
+
+  if (fileExists(resolved)) {
+    throw new Error('Path already exists and is not a directory')
+  }
+
+  await fs.promises.mkdir(resolved)
+
+  return { path: resolved }
+})
+
 // Write a small UTF-8 text file (e.g. a project's IDEA.md at creation). The path
 // is hardened (resolveRequestedPathForIpc) and the parent must already exist —
 // this never creates directory trees or escapes the allowed roots, and content

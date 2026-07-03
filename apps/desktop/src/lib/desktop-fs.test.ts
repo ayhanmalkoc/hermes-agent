@@ -6,6 +6,7 @@ import {
   desktopDefaultCwd,
   desktopFileDiff,
   desktopGitRoot,
+  createDesktopDir,
   readDesktopDir,
   readDesktopFileDataUrl,
   readDesktopFileText,
@@ -14,6 +15,7 @@ import {
 } from './desktop-fs'
 
 const readDir = vi.fn(async () => ({ entries: [{ name: 'local', path: '/local', isDirectory: true }] }))
+const createDir = vi.fn(async (path: string) => ({ path }))
 const readFileText = vi.fn(async () => ({ path: '/local/file.txt', text: 'local', byteSize: 5 }))
 const readFileDataUrl = vi.fn(async () => 'data:text/plain;base64,bG9jYWw=')
 const gitRoot = vi.fn(async () => '/local')
@@ -40,6 +42,10 @@ const api = vi.fn(async ({ path }: { path: string }) => {
     return { cwd: '/backend/project', branch: 'main' }
   }
 
+  if (path === '/api/fs/mkdir') {
+    return { ok: true, path: '/remote/new-project' }
+  }
+
   if (path.startsWith('/api/git/file-diff?')) {
     return { diff: 'remote diff' }
   }
@@ -51,6 +57,7 @@ function stubBridge() {
   vi.stubGlobal('window', {
     hermesDesktop: {
       api,
+      createDir,
       gitRoot,
       readDir,
       readFileDataUrl,
@@ -79,12 +86,14 @@ describe('desktop filesystem facade', () => {
     await expect(readDesktopDir('/work')).resolves.toEqual({
       entries: [{ name: 'local', path: '/local', isDirectory: true }]
     })
+    await expect(createDesktopDir('/work/new-project')).resolves.toEqual({ path: '/work/new-project' })
     await expect(readDesktopFileText('/work/file.txt')).resolves.toMatchObject({ text: 'local' })
     await expect(readDesktopFileDataUrl('/work/file.txt')).resolves.toBe('data:text/plain;base64,bG9jYWw=')
     await expect(desktopGitRoot('/work')).resolves.toBe('/local')
     await expect(selectDesktopPaths({ directories: true })).resolves.toEqual(['/local'])
 
     expect(readDir).toHaveBeenCalledWith('/work')
+    expect(createDir).toHaveBeenCalledWith('/work/new-project')
     expect(readFileText).toHaveBeenCalledWith('/work/file.txt')
     expect(readFileDataUrl).toHaveBeenCalledWith('/work/file.txt')
     expect(gitRoot).toHaveBeenCalledWith('/work')
@@ -96,6 +105,7 @@ describe('desktop filesystem facade', () => {
     $connection.set({ mode: 'remote' } as never)
 
     await expect(readDesktopDir('/home/user/project')).resolves.toMatchObject({ entries: [{ name: 'remote' }] })
+    await expect(createDesktopDir('/home/user/project/new-project')).resolves.toEqual({ path: '/remote/new-project' })
     await expect(readDesktopFileText('/home/user/project/a b.txt')).resolves.toMatchObject({ text: 'remote' })
     await expect(readDesktopFileText('/home/user/project/large.lock', { maxBytes: 10 * 1024 * 1024 })).resolves.toMatchObject({ text: 'remote' })
     await expect(readDesktopFileDataUrl('/home/user/project/a b.txt')).resolves.toBe('data:text/plain;base64,cmVtb3Rl')
@@ -103,12 +113,14 @@ describe('desktop filesystem facade', () => {
     await expect(desktopDefaultCwd()).resolves.toEqual({ cwd: '/backend/project', branch: 'main' })
 
     expect(api).toHaveBeenCalledWith({ path: '/api/fs/list?path=%2Fhome%2Fuser%2Fproject' })
+    expect(api).toHaveBeenCalledWith({ body: { path: '/home/user/project/new-project' }, method: 'POST', path: '/api/fs/mkdir', profile: undefined })
     expect(api).toHaveBeenCalledWith({ path: '/api/fs/read-text?path=%2Fhome%2Fuser%2Fproject%2Fa%20b.txt' })
     expect(api).toHaveBeenCalledWith({ path: '/api/fs/read-text?path=%2Fhome%2Fuser%2Fproject%2Flarge.lock&maxBytes=10485760' })
     expect(api).toHaveBeenCalledWith({ path: '/api/fs/read-data-url?path=%2Fhome%2Fuser%2Fproject%2Fa%20b.txt' })
     expect(api).toHaveBeenCalledWith({ path: '/api/fs/git-root?path=%2Fhome%2Fuser%2Fproject' })
     expect(api).toHaveBeenCalledWith({ path: '/api/fs/default-cwd' })
     expect(readDir).not.toHaveBeenCalled()
+    expect(createDir).not.toHaveBeenCalled()
     expect(readFileText).not.toHaveBeenCalled()
     expect(readFileDataUrl).not.toHaveBeenCalled()
     expect(gitRoot).not.toHaveBeenCalled()

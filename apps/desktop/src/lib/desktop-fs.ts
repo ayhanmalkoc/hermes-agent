@@ -74,6 +74,22 @@ export async function readDesktopDir(path: string): Promise<HermesReadDirResult>
   return remoteFsApi<HermesReadDirResult>(fsPath('list', path))
 }
 
+export async function createDesktopDir(path: string): Promise<{ path: string }> {
+  const desktop = bridge()
+
+  if (!isDesktopFsRemoteMode()) {
+    if (!desktop.createDir) {
+      throw new Error('Create folder is not available')
+    }
+
+    return desktop.createDir(path)
+  }
+
+  const result = await remoteFsApi<{ ok?: boolean; path?: string }>('/api/fs/mkdir', { path })
+
+  return { path: result.path || path }
+}
+
 export async function readDesktopFileText(path: string, options?: { maxBytes?: number }): Promise<HermesReadFileTextResult> {
   if (!isDesktopFsRemoteMode()) {
     return options ? bridge().readFileText(path, options) : bridge().readFileText(path)

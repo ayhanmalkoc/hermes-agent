@@ -128,6 +128,42 @@ def test_fs_read_data_url_rejects_over_cap(client, tmp_path, monkeypatch):
     assert response.status_code == 413
 
 
+def test_fs_mkdir_creates_directory(client, tmp_path):
+    target = tmp_path / "new-project"
+
+    response = client.post("/api/fs/mkdir", json={"path": str(target)})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "path": str(target)}
+    assert target.is_dir()
+
+
+def test_fs_mkdir_existing_directory_is_success(client, tmp_path):
+    target = tmp_path / "existing"
+    target.mkdir()
+
+    response = client.post("/api/fs/mkdir", json={"path": str(target)})
+
+    assert response.status_code == 200
+    assert response.json() == {"ok": True, "path": str(target)}
+
+
+def test_fs_mkdir_rejects_file_collision(client, tmp_path):
+    target = tmp_path / "existing.txt"
+    target.write_text("x")
+
+    response = client.post("/api/fs/mkdir", json={"path": str(target)})
+
+    assert response.status_code == 409
+
+
+def test_fs_mkdir_rejects_missing_parent(client, tmp_path):
+    response = client.post("/api/fs/mkdir", json={"path": str(tmp_path / "missing" / "child")})
+
+    assert response.status_code == 400
+
+
+
 def test_fs_git_root_for_nested_file(client, tmp_path):
     (tmp_path / ".git").mkdir()
     nested = tmp_path / "pkg" / "mod"

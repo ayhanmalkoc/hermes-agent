@@ -1963,6 +1963,27 @@ async def fs_read_data_url(path: str):
         raise HTTPException(status_code=400, detail=str(exc) or "File read failed")
     return {"dataUrl": f"data:{_fs_mime_type(target)};base64,{encoded}"}
 
+class FsMkdir(BaseModel):
+    path: str
+
+@app.post("/api/fs/mkdir")
+async def fs_mkdir(payload: FsMkdir):
+    target = _fs_path(payload.path)
+    parent = target.parent
+    if not parent.is_dir():
+        raise HTTPException(status_code=400, detail="Parent directory does not exist")
+    if target.exists():
+        if target.is_dir():
+            return {"ok": True, "path": str(target)}
+        raise HTTPException(status_code=409, detail="Path already exists and is not a directory")
+    try:
+        target.mkdir()
+    except PermissionError:
+        raise HTTPException(status_code=403, detail="Directory is not writable")
+    except OSError as exc:
+        raise HTTPException(status_code=400, detail=str(exc) or "Directory create failed")
+    return {"ok": True, "path": str(target)}
+
 
 @app.get("/api/fs/git-root")
 async def fs_git_root(path: str):

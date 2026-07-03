@@ -8,6 +8,7 @@ import {
   $projectsRpcAvailable,
   $worktreeRefreshToken,
   ALL_PROJECTS,
+  createDefaultProjectFolder,
   createProject,
   enterProject,
   exitProjectScope,
@@ -26,8 +27,10 @@ vi.mock('@/store/notifications', () => ({
 }))
 
 vi.mock('@/lib/desktop-fs', () => ({
+  createDesktopDir: vi.fn(),
   desktopDefaultCwd: vi.fn(),
   isDesktopFsRemoteMode: vi.fn(),
+  readDesktopDir: vi.fn(),
   selectDesktopPaths: vi.fn(),
   writeDesktopFileText: vi.fn()
 }))
@@ -39,7 +42,9 @@ vi.mock('@/store/gateway', () => ({
 
 const fs = await import('@/lib/desktop-fs')
 const desktopDefaultCwd = vi.mocked(fs.desktopDefaultCwd)
+const createDesktopDir = vi.mocked(fs.createDesktopDir)
 const isDesktopFsRemoteMode = vi.mocked(fs.isDesktopFsRemoteMode)
+const readDesktopDir = vi.mocked(fs.readDesktopDir)
 const selectDesktopPaths = vi.mocked(fs.selectDesktopPaths)
 
 const gw = await import('@/store/gateway')
@@ -164,6 +169,33 @@ describe('createProject', () => {
       'sidebar.projects.staleBackend'
     )
     expect($projectsRpcAvailable.get()).toBe(false)
+  })
+})
+
+describe('createDefaultProjectFolder', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    desktopDefaultCwd.mockResolvedValue({ branch: '', cwd: '/var/lib/hermes' })
+    readDesktopDir.mockResolvedValue({ entries: [], error: 'ENOENT' } as never)
+    createDesktopDir.mockImplementation(async path => ({ path }))
+  })
+
+  it('creates a slug folder from the project name', async () => {
+    await expect(createDefaultProjectFolder('Ağrı Dağı Test')).resolves.toBe('/var/lib/hermes/agri-dagi-test')
+    expect(createDesktopDir).toHaveBeenCalledWith('/var/lib/hermes/agri-dagi-test')
+  })
+
+  it('uses untitled-project when the project name has no slug characters', async () => {
+    await expect(createDefaultProjectFolder('✨')).resolves.toBe('/var/lib/hermes/untitled-project')
+  })
+
+  it('tries a numeric suffix when the slug folder already exists', async () => {
+    readDesktopDir
+      .mockResolvedValueOnce({ entries: [] } as never)
+      .mockResolvedValueOnce({ entries: [], error: 'ENOENT' } as never)
+
+    await expect(createDefaultProjectFolder('Demo')).resolves.toBe('/var/lib/hermes/demo-2')
+    expect(createDesktopDir).toHaveBeenCalledWith('/var/lib/hermes/demo-2')
   })
 })
 

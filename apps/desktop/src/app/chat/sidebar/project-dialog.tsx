@@ -22,6 +22,7 @@ import {
   $projectDialog,
   addProjectFolder,
   closeProjectDialog,
+  createDefaultProjectFolder,
   createProject,
   generateProjectIdea,
   pickProjectFolder,
@@ -120,10 +121,12 @@ export function ProjectDialog() {
       return
     }
 
-    // A project owns sessions by folder (cwd-prefix), so creation requires at
-    // least one — a folder-less project couldn't hold a session anyway.
-    if (mode === 'create' && trimmed && folders.length) {
-      await runSubmit(() => createProject({ folders, idea: idea.trim() || undefined, name: trimmed, use: true }))
+    if (mode === 'create' && trimmed) {
+      await runSubmit(async () => {
+        const projectFolders = folders.length ? folders : [await createDefaultProjectFolder(trimmed)]
+
+        return createProject({ folders: projectFolders, idea: idea.trim() || undefined, name: trimmed, use: true })
+      })
     }
   }
 
@@ -181,7 +184,9 @@ export function ProjectDialog() {
           <div className="flex flex-col gap-1.5">
             <span className="text-[0.6875rem] font-medium text-(--ui-text-tertiary)">{p.foldersLabel}</span>
             {folders.length === 0 ? (
-              <span className="text-[0.75rem] text-(--ui-text-quaternary)">{p.noFolders}</span>
+              <span className="text-[0.75rem] text-(--ui-text-quaternary)">
+                {p.noFolders} Hermes will create one from the project name.
+              </span>
             ) : (
               <ul className="flex flex-col gap-1">
                 {folders.map((folder, index) => (
@@ -288,11 +293,7 @@ export function ProjectDialog() {
             <Button disabled={submitting} onClick={() => onOpenChange(false)} type="button" variant="ghost">
               {t.common.cancel}
             </Button>
-            <Button
-              disabled={submitting || !name.trim() || (mode === 'create' && folders.length === 0)}
-              onClick={() => void submit()}
-              type="button"
-            >
+            <Button disabled={submitting || !name.trim()} onClick={() => void submit()} type="button">
               {mode === 'rename' ? t.common.save : p.create}
             </Button>
           </DialogFooter>
