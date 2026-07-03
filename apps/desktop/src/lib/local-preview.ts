@@ -150,7 +150,7 @@ async function enrichPreviewTarget(target: PreviewTarget | null): Promise<Previe
       binary: result.binary,
       byteSize: result.byteSize,
       language: result.language || target.language,
-      large: (result.byteSize ?? 0) > 512 * 1024,
+      large: false,
       mimeType: result.mimeType
     }
   } catch {

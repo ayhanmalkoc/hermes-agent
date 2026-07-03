@@ -632,6 +632,7 @@ export function LocalFilePreview({
   const isImage = target.previewKind === 'image'
   const isAudio = target.previewKind === 'audio'
   const isVideo = target.previewKind === 'video'
+  const isMedia = isImage || isAudio || isVideo
   const previewMaxBytes = filesMode ? FILES_PREVIEW_MAX_BYTES : TEXT_PREVIEW_MAX_BYTES
 
   useEffect(() => {
@@ -651,11 +652,8 @@ export function LocalFilePreview({
   const isText = target.previewKind === 'text' || target.previewKind === 'binary' || target.previewKind === 'html'
 
   const blockedByTarget =
-    !isImage &&
-    !isAudio &&
-    !isVideo &&
     !forcePreview &&
-    (target.binary || (target.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
+    ((!isMedia && target.binary) || (target.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
 
   useEffect(() => {
     let active = true
@@ -667,7 +665,7 @@ export function LocalFilePreview({
         return
       }
 
-      if (!isImage && !isText) {
+      if (!isMedia && !isText) {
         setState({ loading: false })
 
         return
@@ -676,13 +674,28 @@ export function LocalFilePreview({
       setState({ loading: true })
 
       try {
-        if (isImage) {
+        if (isMedia) {
+          let byteSize = target.byteSize
+
+          if (filesMode && byteSize === undefined) {
+            const metadata = await readTextPreview(filePath)
+            byteSize = metadata.byteSize
+
+            if ((byteSize ?? 0) > previewMaxBytes) {
+              if (active) {
+                setState({ byteSize, loading: false })
+              }
+
+              return
+            }
+          }
+
           // Prefer bytes the caller already handed us (a pasted/dropped
           // screenshot) over re-reading a path that may be transient/unreadable.
           const dataUrl = target.dataUrl || (await readDesktopFileDataUrl(filePath))
 
           if (active) {
-            setState({ dataUrl, loading: false })
+            setState({ byteSize, dataUrl, loading: false })
           }
 
           return
@@ -733,7 +746,7 @@ export function LocalFilePreview({
     return () => {
       active = false
     }
-  }, [blockedByTarget, filePath, forcePreview, isImage, isText, previewMaxBytes, reloadKey, selfReload, target.dataUrl, target.language])
+  }, [blockedByTarget, filePath, filesMode, forcePreview, isMedia, isText, previewMaxBytes, reloadKey, selfReload, target.byteSize, target.dataUrl, target.language])
 
   // Editing is only offered for whole, readable text — never images, binaries,
   // or files we only loaded the first 512 KB of (saving would drop the tail).
@@ -924,12 +937,11 @@ export function LocalFilePreview({
     return <PreviewEmptyState body={state.error} title={t.preview.unavailable} />
   }
 
-  if (
-    !isImage &&
-    !forcePreview &&
-    (target.binary || state.binary || (target.byteSize ?? 0) > previewMaxBytes || (state.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
-  ) {
-    const binary = target.binary || state.binary
+  const blockedBinary = !isMedia && (target.binary || state.binary)
+  const blockedLarge = (target.byteSize ?? 0) > previewMaxBytes || (state.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large)
+
+  if (!forcePreview && (blockedBinary || blockedLarge)) {
+    const binary = blockedBinary
     const size = target.byteSize || state.byteSize
 
     return (
@@ -955,13 +967,13 @@ export function LocalFilePreview({
     )
   }
 
-  if (isVideo || isAudio) {
+  if ((isVideo || isAudio) && state.dataUrl) {
     return (
       <div className="flex h-full w-full items-center justify-center overflow-auto bg-transparent p-4">
         {isVideo ? (
-          <video className="max-h-full max-w-full rounded-lg" controls src={target.url} />
+          <video className="max-h-full max-w-full rounded-lg" controls src={state.dataUrl} />
         ) : (
-          <audio className="w-full max-w-xl" controls src={target.url} />
+          <audio className="w-full max-w-xl" controls src={state.dataUrl} />
         )}
       </div>
     )
