@@ -66,9 +66,9 @@ export async function readDesktopDir(path: string): Promise<HermesReadDirResult>
   return remoteFsApi<HermesReadDirResult>(fsPath('list', path))
 }
 
-export async function readDesktopFileText(path: string): Promise<HermesReadFileTextResult> {
+export async function readDesktopFileText(path: string, options?: { maxBytes?: number }): Promise<HermesReadFileTextResult> {
   if (!isDesktopFsRemoteMode()) {
-    return bridge().readFileText(path)
+    return options ? bridge().readFileText(path, options) : bridge().readFileText(path)
   }
 
   return remoteFsApi<HermesReadFileTextResult>(fsPath('read-text', path))

@@ -216,9 +216,9 @@ function looksBinaryBytes(bytes: Uint8Array) {
   return suspicious / Math.min(bytes.length, 4096) > 0.12
 }
 
-async function readTextPreview(filePath: string) {
+async function readTextPreview(filePath: string, maxBytes?: number) {
   try {
-    return await readDesktopFileText(filePath)
+    return await readDesktopFileText(filePath, maxBytes ? { maxBytes } : undefined)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
 
@@ -646,14 +646,17 @@ export function LocalFilePreview({
     baselineRef.current = ''
   }, [filePath, reloadKey, richPreviewEnabled])
 
-  // HTML files are rendered as source code, not in a webview - so they take
-  // the same path as plain text files. `previewKind === 'binary'` arrives
-  // when the file is forcibly previewed past the binary refusal screen.
-  const isText = target.previewKind === 'text' || target.previewKind === 'binary' || target.previewKind === 'html'
+  // Files workspace is text-first: any non-media, non-declared-binary file is
+  // read as source and then sniffed. Unknown extensions like lockfiles must not
+  // fall through to an empty/no-inline surface.
+  const isDeclaredBinary = target.previewKind === 'binary'
+  const isText = filesMode
+    ? !isMedia && !isDeclaredBinary
+    : target.previewKind === 'text' || target.previewKind === 'binary' || target.previewKind === 'html'
 
   const blockedByTarget =
     !forcePreview &&
-    ((!isMedia && target.binary) || (target.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
+    (isDeclaredBinary || (!isMedia && target.binary) || (target.byteSize ?? 0) > previewMaxBytes || (!filesMode && target.large))
 
   useEffect(() => {
     let active = true
@@ -678,7 +681,7 @@ export function LocalFilePreview({
           let byteSize = target.byteSize
 
           if (filesMode && byteSize === undefined) {
-            const metadata = await readTextPreview(filePath)
+            const metadata = await readTextPreview(filePath, previewMaxBytes)
             byteSize = metadata.byteSize
 
             if ((byteSize ?? 0) > previewMaxBytes) {
@@ -701,7 +704,7 @@ export function LocalFilePreview({
           return
         }
 
-        const result = await readTextPreview(filePath)
+        const result = await readTextPreview(filePath, previewMaxBytes)
 
         if (active) {
           const shouldBlock = !forcePreview && (result.binary || (result.byteSize ?? 0) > previewMaxBytes)

@@ -6531,14 +6531,18 @@ ipcMain.handle('hermes:readFileDataUrl', async (_event, filePath) => {
   return `data:${mimeTypeForPath(resolvedPath)};base64,${data.toString('base64')}`
 })
 
-ipcMain.handle('hermes:readFileText', async (_event, filePath) => {
+ipcMain.handle('hermes:readFileText', async (_event, filePath, options = {}) => {
+  const requestedMaxBytes = Number(options?.maxBytes)
+  const previewMaxBytes = Number.isFinite(requestedMaxBytes)
+    ? Math.min(Math.max(1, requestedMaxBytes), TEXT_PREVIEW_SOURCE_MAX_BYTES)
+    : TEXT_PREVIEW_MAX_BYTES
   const { resolvedPath, stat } = await resolveReadableFileForIpc(filePath, {
     maxBytes: TEXT_PREVIEW_SOURCE_MAX_BYTES,
     purpose: 'Text preview'
   })
   const ext = path.extname(resolvedPath).toLowerCase()
   const handle = await fs.promises.open(resolvedPath, 'r')
-  const bytesToRead = Math.min(stat.size, TEXT_PREVIEW_MAX_BYTES)
+  const bytesToRead = Math.min(stat.size, previewMaxBytes)
 
   try {
     const buffer = Buffer.alloc(bytesToRead)
@@ -6551,7 +6555,7 @@ ipcMain.handle('hermes:readFileText', async (_event, filePath) => {
       mimeType: mimeTypeForPath(resolvedPath),
       path: resolvedPath,
       text: buffer.subarray(0, bytesRead).toString('utf8'),
-      truncated: stat.size > TEXT_PREVIEW_MAX_BYTES
+      truncated: stat.size > previewMaxBytes
     }
   } finally {
     await handle.close()
