@@ -92,6 +92,7 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
         onNodeOpenChange={setNodeOpen}
         onPreviewFile={path => void previewFile(path)}
         openState={openState}
+        previewOnSelect
       />
       {rootLoading && <div className="px-3 py-2 text-xs text-muted-foreground">Yükleniyor...</div>}
     </div>

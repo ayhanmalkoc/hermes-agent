@@ -42,6 +42,7 @@ interface ProjectTreeProps {
   onNodeOpenChange: (id: string, open: boolean) => void
   onPreviewFile?: (path: string) => void
   openState: Record<string, boolean>
+  previewOnSelect?: boolean
 }
 
 export function ProjectTree({
@@ -53,7 +54,8 @@ export function ProjectTree({
   onLoadChildren,
   onNodeOpenChange,
   onPreviewFile,
-  openState
+  openState,
+  previewOnSelect = false
 }: ProjectTreeProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const treeRef = useRef<TreeApi<TreeNode> | null>(null)
@@ -204,6 +206,7 @@ export function ProjectTree({
               onAttachFile={onActivateFile}
               onAttachFolder={onActivateFolder}
               onPreviewFile={onPreviewFile}
+              previewOnSelect={previewOnSelect}
               relativeTo={cwd}
             />
           )}
@@ -250,6 +253,7 @@ function ProjectTreeRow({
   onAttachFile,
   onAttachFolder,
   onPreviewFile,
+  previewOnSelect,
   relativeTo,
   style
 }: NodeRendererProps<TreeNode> & {
@@ -257,6 +261,7 @@ function ProjectTreeRow({
   onAttachFile: (path: string) => void
   onAttachFolder: (path: string) => void
   onPreviewFile?: (path: string) => void
+  previewOnSelect?: boolean
   relativeTo?: null | string
 }) {
   const renamingPath = useStore($renamingPath)
@@ -300,6 +305,9 @@ function ProjectTreeRow({
           node.toggle()
         } else {
           node.select()
+          if (previewOnSelect) {
+            onPreviewFile?.(node.data.id)
+          }
         }
       }}
       onDoubleClick={event => {
