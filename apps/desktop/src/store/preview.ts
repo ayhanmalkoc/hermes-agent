@@ -157,7 +157,7 @@ function openFilePreviewTarget(target: PreviewTarget) {
 // Manual/file-browser opens are "peeking at a file" → source view in the file
 // pane. Tool/explicit-link opens are runnable artifacts → live preview pane.
 function isFilePreviewSource(source: PreviewRecordSource): boolean {
-  return source === 'file-browser' || source === 'manual'
+  return source === 'explicit-link' || source === 'file-browser' || source === 'manual'
 }
 
 function previewTargetForSource(target: PreviewTarget, source: PreviewRecordSource): PreviewTarget {

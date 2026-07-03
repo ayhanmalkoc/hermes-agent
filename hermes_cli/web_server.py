@@ -1872,11 +1872,14 @@ async def fs_list(path: str):
 
 
 @app.get("/api/fs/read-text")
-async def fs_read_text(path: str):
+async def fs_read_text(path: str, maxBytes: int | None = None):
     target, st = _fs_regular_file(_fs_path(path))
     if st.st_size > _FS_TEXT_SOURCE_MAX_BYTES:
         raise HTTPException(status_code=413, detail="File too large")
-    bytes_to_read = min(st.st_size, _FS_TEXT_PREVIEW_MAX_BYTES)
+    preview_max_bytes = _FS_TEXT_PREVIEW_MAX_BYTES
+    if maxBytes is not None:
+        preview_max_bytes = min(max(1, maxBytes), _FS_TEXT_SOURCE_MAX_BYTES)
+    bytes_to_read = min(st.st_size, preview_max_bytes)
     try:
         with target.open("rb") as handle:
             data = handle.read(bytes_to_read)
@@ -1891,7 +1894,7 @@ async def fs_read_text(path: str):
         "mimeType": _fs_mime_type(target),
         "path": str(target),
         "text": data.decode("utf-8", errors="replace"),
-        "truncated": st.st_size > _FS_TEXT_PREVIEW_MAX_BYTES,
+        "truncated": st.st_size > preview_max_bytes,
     }
 
 

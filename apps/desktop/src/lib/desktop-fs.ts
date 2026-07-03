@@ -38,8 +38,16 @@ export function desktopFsProfile(): string | undefined {
   return $connection.get()?.profile || undefined
 }
 
-function fsPath(endpoint: string, filePath: string) {
-  return `/api/fs/${endpoint}?path=${encodeURIComponent(filePath)}`
+function fsPath(endpoint: string, filePath: string, params?: Record<string, number | string | undefined>) {
+  const search = [`path=${encodeURIComponent(filePath)}`]
+
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined) {
+      search.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    }
+  }
+
+  return `/api/fs/${endpoint}?${search.join('&')}`
 }
 
 function bridge() {
@@ -71,7 +79,7 @@ export async function readDesktopFileText(path: string, options?: { maxBytes?: n
     return options ? bridge().readFileText(path, options) : bridge().readFileText(path)
   }
 
-  return remoteFsApi<HermesReadFileTextResult>(fsPath('read-text', path))
+  return remoteFsApi<HermesReadFileTextResult>(fsPath('read-text', path, { maxBytes: options?.maxBytes }))
 }
 
 // Save UTF-8 text back to a file. Local writes go through the hardened Electron

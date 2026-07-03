@@ -4,7 +4,6 @@ import { $rightRailActiveTabId, PREVIEW_PANE_ID, RIGHT_RAIL_PREVIEW_TAB_ID } fro
 import { $paneOpen } from './panes'
 import {
   $filePreviewTabs,
-  $filePreviewTarget,
   $previewServerRestart,
   $previewServerRestartStatus,
   $previewTarget,
@@ -19,6 +18,7 @@ import {
   setCurrentSessionPreviewTarget
 } from './preview'
 import { $activeSessionId, $selectedStoredSessionId } from './session'
+import { $activeRightWorkspaceTab, $activeRightWorkspaceTabId, $rightWorkspaceTabs } from './right-workspace'
 
 function previewTarget(source: string): PreviewTarget {
   return {
@@ -42,6 +42,9 @@ describe('preview store', () => {
     $selectedStoredSessionId.set(null)
     window.localStorage.clear()
     clearSessionPreviewRegistry()
+    $filePreviewTabs.set([])
+    $rightWorkspaceTabs.set([])
+    $activeRightWorkspaceTabId.set(null)
   })
 
   afterEach(() => {
@@ -50,6 +53,9 @@ describe('preview store', () => {
     $selectedStoredSessionId.set(null)
     window.localStorage.clear()
     clearSessionPreviewRegistry()
+    $filePreviewTabs.set([])
+    $rightWorkspaceTabs.set([])
+    $activeRightWorkspaceTabId.set(null)
   })
 
   it('does not notify status subscribers for restart progress text', () => {
@@ -113,14 +119,24 @@ describe('preview store', () => {
 
     setCurrentSessionPreviewTarget(target, 'manual')
 
-    expect($filePreviewTarget.get()).toEqual(withRenderMode(target, 'source'))
+    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'source'))
     expect($previewTarget.get()).toEqual(withRenderMode(preview, 'preview'))
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(preview, 'preview'))
 
     closeActiveRightRailTab()
 
-    expect($filePreviewTarget.get()).toBeNull()
-    expect($previewTarget.get()).toEqual(withRenderMode(preview, 'preview'))
+    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'source'))
+    expect($previewTarget.get()).toBeNull()
+  })
+
+  it('opens explicit file preview links in Files instead of live preview', () => {
+    const target = previewTarget('/work/from-chat.html')
+
+    setCurrentSessionPreviewTarget(target, 'explicit-link')
+
+    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'source'))
+    expect($previewTarget.get()).toBeNull()
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
   })
 
   it('keeps file tabs when a live preview opens', () => {
@@ -131,8 +147,10 @@ describe('preview store', () => {
     setCurrentSessionPreviewTarget(live, 'tool-result')
 
     expect($filePreviewTabs.get().map(tab => tab.target)).toEqual([withRenderMode(file, 'source')])
-    expect($filePreviewTarget.get()).toBeNull()
+    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(file, 'source'))
     expect($rightRailActiveTabId.get()).toBe(RIGHT_RAIL_PREVIEW_TAB_ID)
     expect($previewTarget.get()).toEqual(withRenderMode(live, 'preview'))
   })
 })
+
+
