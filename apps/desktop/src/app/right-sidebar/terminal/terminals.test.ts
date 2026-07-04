@@ -138,7 +138,7 @@ describe('terminal store persistence', () => {
     expect($rightWorkspaceTabs.get()).toEqual([])
   })
 
-  it('keeps agent terminal tabs visible without stealing focus', async () => {
+  it('focuses a newly visible agent terminal tab once', async () => {
     const { createAndOpenTerminal, ensureAgentTerminal } = await loadTerminalStore()
     const { $activeRightWorkspaceTabId, $rightWorkspaceTabs } = await import('@/store/right-workspace')
 
@@ -149,7 +149,9 @@ describe('terminal store persistence', () => {
       { id: `terminal:${userId}`, kind: 'terminal', terminalId: userId },
       { id: `terminal:${agentId}`, kind: 'terminal', terminalId: agentId }
     ])
-    expect($activeRightWorkspaceTabId.get()).toBe(`terminal:${userId}`)
+    expect($activeRightWorkspaceTabId.get()).toBe(`terminal:${agentId}`)
+
+    $activeRightWorkspaceTabId.set(`terminal:${userId}`)
 
     $rightWorkspaceTabs.set($rightWorkspaceTabs.get().filter(tab => tab.terminalId !== agentId))
     ensureAgentTerminal('proc-1', 'agent task')

@@ -282,7 +282,7 @@ export function ensureAgentTerminal(procId: string, title: string): string | nul
   surfacedProcs.add(procId)
   const id = newId()
   $terminals.set([...$terminals.get(), { id, title: title || 'agent', auto: false, cwd: '', kind: 'agent', procId, scopeKey: activeScopeKey }])
-  openTerminalWorkspaceForTerminal(id, title || 'agent', false)
+  openTerminalWorkspaceForTerminal(id, title || 'agent')
 
   return id
 }
