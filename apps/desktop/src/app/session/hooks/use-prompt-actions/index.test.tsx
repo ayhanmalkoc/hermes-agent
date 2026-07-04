@@ -251,7 +251,7 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
 
     await handle!.submitText('/goal write the implementation plan')
 
-    expect(calls.map(c => c.method)).toEqual(['slash.exec', 'prompt.submit'])
+    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['slash.exec', 'prompt.submit']))
     expect(calls[0]?.params).toEqual({
       command: 'goal write the implementation plan',
       session_id: RUNTIME_SESSION_ID
@@ -279,11 +279,12 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
     updateStudioRunContext({ goalEnabled: true })
 
     const calls: { method: string; params?: Record<string, unknown> }[] = []
+    const states: Record<string, unknown>[] = []
 
     const requestGateway = vi.fn(async (method: string, params?: Record<string, unknown>) => {
       calls.push({ method, params })
 
-      if (method === 'slash.exec') {
+      if (method === 'command.dispatch') {
         return {
           type: 'send',
           notice: '⊙ Goal set. Starting now.',
@@ -298,16 +299,18 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
     render(
       <Harness
         onReady={h => (handle = h)}
+        onSeedState={s => states.push(s)}
         refreshSessions={async () => undefined}
         requestGateway={requestGateway}
       />
     )
 
-    await handle!.submitText('improve onboarding')
+    expect(await handle!.submitText('improve onboarding')).toBe(true)
 
-    expect(calls.map(c => c.method)).toEqual(['slash.exec', 'prompt.submit'])
+    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['command.dispatch', 'prompt.submit']))
     expect(calls[0]?.params).toEqual({
-      command: 'goal improve onboarding',
+      arg: 'improve onboarding',
+      name: 'goal',
       session_id: RUNTIME_SESSION_ID
     })
     expect(calls[1]?.params).toEqual({

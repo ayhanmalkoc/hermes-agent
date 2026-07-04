@@ -6,7 +6,7 @@ import { transcribeAudio, PROMPT_SUBMIT_REQUEST_TIMEOUT_MS } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { stripAnsi } from '@/lib/ansi'
 import { branchGroupForUser, type ChatMessage, chatMessageText, textPart } from '@/lib/chat-messages'
-import { pathLabel, SLASH_COMMAND_RE } from '@/lib/chat-runtime'
+import { parseCommandDispatch, pathLabel, SLASH_COMMAND_RE } from '@/lib/chat-runtime'
 import { triggerHaptic } from '@/lib/haptics'
 import { setMutableRef } from '@/lib/mutable-ref'
 import { clearClarifyRequest } from '@/store/clarify'
@@ -463,9 +463,69 @@ export function usePromptActions({
 
       if (studioGoalText) {
         triggerHaptic('selection')
-        await executeSlashCommand(studioGoalText)
+        const sessionId = activeSessionIdRef.current || (await createBackendSessionForSend(visibleText))
 
-        return true
+        if (!sessionId) {
+          notify({ kind: 'error', title: copy.sessionUnavailable, message: copy.createSessionFailed })
+
+          return false
+        }
+
+        const dispatch = parseCommandDispatch(
+          await requestGateway<unknown>('command.dispatch', { session_id: sessionId, name: 'goal', arg: visibleText })
+        )
+
+        if (!dispatch) {
+          appendSessionTextMessage(sessionId, 'system', '/goal: invalid response')
+
+          return false
+        }
+
+        if ((dispatch.type === 'send' || dispatch.type === 'prefill') && dispatch.notice?.trim()) {
+          appendSessionTextMessage(sessionId, 'system', dispatch.notice.trim())
+        }
+
+        if (dispatch.type === 'send') {
+          const message = dispatch.message.trim()
+
+          if (!message) {
+            appendSessionTextMessage(sessionId, 'system', '/goal: empty message')
+
+            return false
+          }
+
+          appendSessionTextMessage(sessionId, 'user', message)
+          setMutableRef(busyRef, true)
+          setBusy(true)
+          setAwaitingResponse(true)
+
+          try {
+            await requestGateway(
+              'prompt.submit',
+              { session_id: sessionId, text: message },
+              PROMPT_SUBMIT_REQUEST_TIMEOUT_MS
+            )
+
+            return true
+          } catch (err) {
+            setMutableRef(busyRef, false)
+            setBusy(false)
+            setAwaitingResponse(false)
+            notifyError(err, copy.sessionUnavailable)
+
+            return false
+          }
+        }
+
+        if (dispatch.type === 'exec' || dispatch.type === 'plugin') {
+          appendSessionTextMessage(sessionId, 'system', dispatch.output ?? '(no output)')
+
+          return true
+        }
+
+        appendSessionTextMessage(sessionId, 'system', `/goal: unsupported response: ${dispatch.type}`)
+
+        return false
       }
 
       if (!attachments.length && SLASH_COMMAND_RE.test(visibleText)) {
@@ -477,7 +537,7 @@ export function usePromptActions({
 
       return await submitPromptText(rawText, options)
     },
-    [executeSlashCommand, submitPromptText]
+    [activeSessionIdRef, appendSessionTextMessage, copy, createBackendSessionForSend, executeSlashCommand, requestGateway, submitPromptText]
   )
 
   const transcribeVoiceAudio = useCallback(

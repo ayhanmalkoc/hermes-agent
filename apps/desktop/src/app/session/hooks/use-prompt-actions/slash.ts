@@ -179,7 +179,7 @@ export function useSlashCommand(deps: SlashCommandDeps) {
             return
           }
 
-          await submitPromptText(message)
+          await submitPromptText(message, { fromQueue: true })
         }
 
         try {
