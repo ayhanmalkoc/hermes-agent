@@ -5,8 +5,6 @@ import { readKey, writeKey } from '@/lib/storage'
 const STORAGE_KEY = 'hermes.desktop.studio.state'
 
 export type StudioTeamPolicy = 'lead_routes' | 'parallel' | 'sequential'
-export type StudioActiveView = 'cockpit' | 'sessions' | 'agents' | 'teams' | 'outputs' | 'automations'
-export type StudioLiveOpsTab = 'live' | 'approvals' | 'subagents' | 'terminal' | 'goal'
 
 export interface StudioAgent {
   id: string
@@ -30,7 +28,17 @@ export interface StudioTeam {
   defaultToolset?: string
 }
 
+export interface StudioWork {
+  id: string
+  title: string
+  sessionIds: string[]
+  projectCwd?: string
+  status: 'active' | 'paused' | 'done'
+  activeGoal?: string
+}
+
 export interface StudioRunContext {
+  workId?: string
   goalEnabled: boolean
   teamIds: string[]
   agentIds: string[]
@@ -41,10 +49,9 @@ export interface StudioRunContext {
 
 interface StudioState {
   modeEnabled: boolean
-  activeView: StudioActiveView
-  liveOpsTab: StudioLiveOpsTab
   agents: StudioAgent[]
   teams: StudioTeam[]
+  works: StudioWork[]
   runContext: StudioRunContext
 }
 
@@ -82,48 +89,28 @@ const defaultTeams: StudioTeam[] = [
   }
 ]
 
+const defaultWorks: StudioWork[] = [
+  { id: 'studio-mvp', title: 'Studio Mode MVP', sessionIds: [], status: 'active' }
+]
+
 const defaultState: StudioState = {
   modeEnabled: false,
-  activeView: 'cockpit',
-  liveOpsTab: 'live',
   agents: defaultAgents,
   teams: defaultTeams,
+  works: defaultWorks,
   runContext: { goalEnabled: false, teamIds: [], agentIds: [] }
-}
-
-function normalizeActiveView(value: unknown): StudioActiveView {
-  return value === 'sessions' || value === 'agents' || value === 'teams' || value === 'outputs' || value === 'automations'
-    ? value
-    : 'cockpit'
-}
-
-function normalizeLiveOpsTab(value: unknown): StudioLiveOpsTab {
-  return value === 'approvals' || value === 'subagents' || value === 'terminal' || value === 'goal' ? value : 'live'
-}
-
-function normalizeRunContext(value: unknown): StudioRunContext {
-  const parsed = value && typeof value === 'object' ? (value as Partial<StudioRunContext>) : {}
-
-  return {
-    goalEnabled: Boolean(parsed.goalEnabled),
-    teamIds: Array.isArray(parsed.teamIds) ? parsed.teamIds.filter(item => typeof item === 'string') : [],
-    agentIds: Array.isArray(parsed.agentIds) ? parsed.agentIds.filter(item => typeof item === 'string') : [],
-    activeAgentId: typeof parsed.activeAgentId === 'string' ? parsed.activeAgentId : undefined,
-    modelOverride: typeof parsed.modelOverride === 'string' ? parsed.modelOverride : undefined,
-    toolset: typeof parsed.toolset === 'string' ? parsed.toolset : undefined
-  }
 }
 
 function normalizeState(value: unknown): StudioState {
   const parsed = value && typeof value === 'object' ? (value as Partial<StudioState>) : {}
 
   return {
-    modeEnabled: Boolean(parsed.modeEnabled),
-    activeView: normalizeActiveView(parsed.activeView),
-    liveOpsTab: normalizeLiveOpsTab(parsed.liveOpsTab),
+    ...defaultState,
+    ...parsed,
     agents: Array.isArray(parsed.agents) && parsed.agents.length ? parsed.agents : defaultAgents,
     teams: Array.isArray(parsed.teams) && parsed.teams.length ? parsed.teams : defaultTeams,
-    runContext: normalizeRunContext(parsed.runContext)
+    works: Array.isArray(parsed.works) && parsed.works.length ? parsed.works : defaultWorks,
+    runContext: { ...defaultState.runContext, ...(parsed.runContext ?? {}) }
   }
 }
 
@@ -148,11 +135,10 @@ function saveState(state: StudioState): void {
 export const $studioState = atom<StudioState>(loadState())
 
 export const $studioModeEnabled = computed($studioState, state => state.modeEnabled)
-export const $studioActiveView = computed($studioState, state => state.activeView)
-export const $studioLiveOpsTab = computed($studioState, state => state.liveOpsTab)
 export const $studioRunContext = computed($studioState, state => state.runContext)
 export const $studioAgents = computed($studioState, state => state.agents)
 export const $studioTeams = computed($studioState, state => state.teams)
+export const $studioWorks = computed($studioState, state => state.works)
 
 function updateStudioState(updater: (state: StudioState) => StudioState): void {
   const next = updater($studioState.get())
@@ -164,28 +150,16 @@ export function setStudioModeEnabled(enabled: boolean): void {
   updateStudioState(state => ({ ...state, modeEnabled: enabled }))
 }
 
-export function toggleStudioMode(): void {
-  setStudioModeEnabled(!$studioModeEnabled.get())
-}
-
-export function exitStudioMode(): void {
-  setStudioModeEnabled(false)
-}
-
-export function setStudioActiveView(activeView: StudioActiveView): void {
-  updateStudioState(state => ({ ...state, activeView }))
-}
-
-export function setStudioLiveOpsTab(liveOpsTab: StudioLiveOpsTab): void {
-  updateStudioState(state => ({ ...state, liveOpsTab }))
-}
-
 export function updateStudioRunContext(patch: Partial<StudioRunContext>): void {
   updateStudioState(state => ({ ...state, runContext: { ...state.runContext, ...patch } }))
 }
 
 export function toggleStudioGoal(): void {
   updateStudioRunContext({ goalEnabled: !$studioState.get().runContext.goalEnabled })
+}
+
+export function selectStudioWork(workId: string | undefined): void {
+  updateStudioRunContext({ workId })
 }
 
 export function selectStudioTeam(teamId: string | undefined): void {
@@ -213,55 +187,43 @@ export function selectStudioAgent(agentId: string | undefined): void {
   })
 }
 
-export function setStudioModelOverride(modelOverride: string | undefined): void {
-  updateStudioRunContext({ modelOverride: modelOverride?.trim() || undefined })
-}
-
-export function setStudioToolset(toolset: string | undefined): void {
-  updateStudioRunContext({ toolset: toolset?.trim() || undefined })
-}
-
-export function studioPromptText(input: string): string {
-  const message = input.trim()
-  if (!message) {
-    return message
-  }
-
+function selectedLabels() {
   const state = $studioState.get()
-  if (!state.modeEnabled) {
-    return message
-  }
-
   const context = state.runContext
-  const parts: string[] = []
-  const selectedTeams = state.teams.filter(item => context.teamIds.includes(item.id))
-  const selectedAgents = state.agents.filter(item => context.agentIds.includes(item.id))
+  const work = state.works.find(item => item.id === context.workId)
+  const teams = context.teamIds.map(id => state.teams.find(item => item.id === id)?.name).filter(Boolean)
+  const agents = context.agentIds.map(id => state.agents.find(item => item.id === id)?.name).filter(Boolean)
   const activeAgent = state.agents.find(item => item.id === context.activeAgentId)
 
-  if (selectedTeams.length) {
-    parts.push(`Team: ${selectedTeams.map(item => item.name).join(', ')}`)
-  }
-  if (selectedAgents.length) {
-    parts.push(`Agents: ${selectedAgents.map(item => item.name).join(', ')}`)
-  }
-  if (activeAgent) {
-    parts.push(`Active agent: ${activeAgent.name}`)
-  }
-  if (context.modelOverride) {
-    parts.push(`Model: ${context.modelOverride}`)
-  }
-  if (context.toolset) {
-    parts.push(`Toolset: ${context.toolset}`)
-  }
-
-  if (!parts.length) {
-    return message
-  }
-
-  return `[Studio Context]\n${parts.join('\n')}\n\n${message}`
+  return { activeAgent, agents, context, teams, work }
 }
 
-export function studioGoalCommand(input: string): string {
-  const message = studioPromptText(input).trim()
-  return message.startsWith('/goal') ? message : `/goal ${message}`
+export function studioContextBlock(): string {
+  const { activeAgent, agents, context, teams, work } = selectedLabels()
+  const lines = ['Studio context:']
+
+  if (work) lines.push(`- Work: ${work.title}`)
+  if (context.goalEnabled) lines.push('- Goal mode: enabled')
+  if (teams.length) lines.push(`- Team: ${teams.join(', ')}`)
+  if (agents.length) lines.push(`- Agents: ${agents.join(', ')}`)
+  if (activeAgent) lines.push(`- Active agent focus: ${activeAgent.name} — ${activeAgent.role}`)
+  if (context.modelOverride) lines.push(`- Model override: ${context.modelOverride}`)
+  if (context.toolset) lines.push(`- Toolset: ${context.toolset}`)
+
+  return lines.length > 1 ? lines.join('\n') : ''
 }
+
+export function studioPromptText(text: string): string {
+  const block = studioContextBlock()
+
+  return block ? `${block}\n\nUser request:\n${text}` : text
+}
+
+export function studioGoalCommand(text: string): string | null {
+  if (!$studioState.get().runContext.goalEnabled) {
+    return null
+  }
+
+  return `/goal ${studioPromptText(text)}`
+}
+

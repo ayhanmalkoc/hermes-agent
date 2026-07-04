@@ -18,7 +18,6 @@ import {
 } from '@/store/layout'
 import { $paneOpen } from '@/store/panes'
 import { RIGHT_WORKSPACE_PANE_ID, toggleRightWorkspaceOpen } from '@/store/right-workspace'
-import { $studioModeEnabled, toggleStudioMode } from '@/store/studio'
 
 import { appViewForPath, isOverlayView } from '../routes'
 
@@ -43,12 +42,11 @@ export type SetTitlebarToolGroup = (id: string, tools: readonly TitlebarTool[], 
 
 interface TitlebarControlsProps extends ComponentProps<'div'> {
   leftTools?: readonly TitlebarTool[]
-  studioChromeOnly?: boolean
   tools?: readonly TitlebarTool[]
   onOpenSettings: () => void
 }
 
-export function TitlebarControls({ leftTools = [], studioChromeOnly = false, tools = [], onOpenSettings }: TitlebarControlsProps) {
+export function TitlebarControls({ leftTools = [], tools = [], onOpenSettings }: TitlebarControlsProps) {
   const { t } = useI18n()
   const navigate = useNavigate()
   const location = useLocation()
@@ -56,7 +54,6 @@ export function TitlebarControls({ leftTools = [], studioChromeOnly = false, too
   const rightWorkspaceOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const sidebarOpen = useStore($sidebarOpen)
   const panesFlipped = useStore($panesFlipped)
-  const studioModeEnabled = useStore($studioModeEnabled)
 
   const toggleHaptics = () => {
     if (!hapticsMuted) {
@@ -88,19 +85,8 @@ export function TitlebarControls({ leftTools = [], studioChromeOnly = false, too
       }
     },
     {
-      active: studioModeEnabled,
-      icon: <Codicon name="organization" />,
-      id: 'studio-mode',
-      label: studioModeEnabled ? 'Exit Studio' : 'Enter Studio',
-      onSelect: () => {
-        triggerHaptic('tap')
-        toggleStudioMode()
-      }
-    },
-    {
       icon: <Codicon name="arrow-swap" />,
       id: 'flip-panes',
-      hidden: studioChromeOnly,
       label: t.titlebar.swapSidebarSides,
       onSelect: () => {
         triggerHaptic('tap')
@@ -108,7 +94,7 @@ export function TitlebarControls({ leftTools = [], studioChromeOnly = false, too
       },
       title: t.titlebar.swapSidebarSidesTitle
     },
-    ...leftTools.map(tool => ({ ...tool, hidden: studioChromeOnly || tool.hidden }))
+    ...leftTools
   ]
 
   const rightSidebarTool: TitlebarTool = {
@@ -154,14 +140,14 @@ export function TitlebarControls({ leftTools = [], studioChromeOnly = false, too
   // visually own the window. These control clusters are `fixed` at a higher
   // z-index than the overlay card, so they'd otherwise bleed over it — hide them
   // and let the overlay's own chrome (close button, drag region) take over.
-  if (!studioChromeOnly && isOverlayView(appViewForPath(location.pathname))) {
+  if (isOverlayView(appViewForPath(location.pathname))) {
     return null
   }
 
   const visibleSystemTools = systemTools.filter(tool => !tool.hidden)
   const settingsTool = visibleSystemTools.find(tool => tool.id === 'settings')
   const visibleSystemToolsBeforeSettings = visibleSystemTools.filter(tool => tool.id !== 'settings')
-  const visiblePaneTools = studioChromeOnly ? [] : tools.filter(tool => !tool.hidden)
+  const visiblePaneTools = tools.filter(tool => !tool.hidden)
 
   return (
     <>
@@ -195,18 +181,16 @@ export function TitlebarControls({ leftTools = [], studioChromeOnly = false, too
         </div>
       )}
 
-      {!studioChromeOnly && (
-        <div
-          aria-label={t.shell.appControls}
-          className="fixed right-(--titlebar-tools-right) top-(--titlebar-controls-top) z-70 flex flex-row items-center justify-end gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
-        >
-          {visibleSystemToolsBeforeSettings.map(tool => (
-            <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
-          ))}
-          {settingsTool && <TitlebarToolButton navigate={navigate} tool={settingsTool} />}
-          <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
-        </div>
-      )}
+      <div
+        aria-label={t.shell.appControls}
+        className="fixed right-(--titlebar-tools-right) top-(--titlebar-controls-top) z-70 flex flex-row items-center justify-end gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
+      >
+        {visibleSystemToolsBeforeSettings.map(tool => (
+          <TitlebarToolButton key={tool.id} navigate={navigate} tool={tool} />
+        ))}
+        {settingsTool && <TitlebarToolButton navigate={navigate} tool={settingsTool} />}
+        <TitlebarToolButton navigate={navigate} tool={rightSidebarTool} />
+      </div>
     </>
   )
 }
@@ -259,3 +243,4 @@ function TitlebarToolButton({ navigate, tool }: { navigate: ReturnType<typeof us
     </Tip>
   )
 }
+

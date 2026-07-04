@@ -41,7 +41,7 @@ import {
   setRightWorkspaceScope
 } from '../store/right-workspace'
 import { setTerminalScope, showTerminalWorkspace } from './right-sidebar/terminal/terminals'
-import { $paneOpen, setPaneOpen } from '../store/panes'
+import { $paneOpen } from '../store/panes'
 import { setPetActivity } from '../store/pet'
 import { setPetScale } from '../store/pet-gallery'
 import {
@@ -57,7 +57,6 @@ import {
 } from '../store/profile'
 import { $startWorkSessionRequest, followActiveSessionCwd, resolveNewSessionCwd } from '../store/projects'
 import { $reviewOpen } from '../store/review'
-import { $studioModeEnabled } from '../store/studio'
 import {
   $activeSessionId,
   $connection,
@@ -119,7 +118,6 @@ import { useSessionActions } from './session/hooks/use-session-actions'
 import { useSessionListActions } from './session/hooks/use-session-list-actions'
 import { useSessionStateCache } from './session/hooks/use-session-state-cache'
 import { AppShell } from './shell/app-shell'
-import { StudioLiveOps } from './studio/live-ops'
 import { useOverlayRouting } from './shell/hooks/use-overlay-routing'
 import { useStatusSnapshot } from './shell/hooks/use-status-snapshot'
 import { useStatusbarItems } from './shell/hooks/use-statusbar-items'
@@ -170,7 +168,6 @@ export function DesktopController() {
   const reviewOpen = useStore($reviewOpen)
   const rightWorkspacePaneOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const panesFlipped = useStore($panesFlipped)
-  const studioModeEnabled = useStore($studioModeEnabled)
   const profileScope = useStore($profileScope)
   // Below SIDEBAR_COLLAPSE_BREAKPOINT_PX there's no room for a docked rail —
   // collapse both sidebars (without touching their stored open state) so the
@@ -258,12 +255,6 @@ export function DesktopController() {
       showTerminalWorkspace()
     }
   }, [terminalTakeover])
-
-  useEffect(() => {
-    if (studioModeEnabled) {
-      setPaneOpen(RIGHT_WORKSPACE_PANE_ID, true)
-    }
-  }, [studioModeEnabled])
 
   useEffect(() => {
     if (reviewOpen) {
@@ -1103,8 +1094,8 @@ export function DesktopController() {
 
   const rightWorkspacePane = (
     <Pane
-      defaultOpen={studioModeEnabled}
-      disabled={!studioModeEnabled && !chatOpen && currentView !== 'artifacts'}
+      defaultOpen={false}
+      disabled={!chatOpen && currentView !== 'artifacts'}
       id={RIGHT_WORKSPACE_PANE_ID}
       key="right-workspace"
       maxWidth={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '42rem'}
@@ -1113,11 +1104,7 @@ export function DesktopController() {
       side={railSide}
       width={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '34rem'}
     >
-      {studioModeEnabled ? (
-        <StudioLiveOps onOpenTerminal={showTerminalWorkspace} />
-      ) : (
-        <RightWorkspace gateway={gatewayRef.current || undefined} />
-      )}
+      <RightWorkspace gateway={gatewayRef.current || undefined} />
     </Pane>
   )
 
@@ -1129,7 +1116,6 @@ export function DesktopController() {
       onOpenSettings={openSettings}
       overlays={overlays}
       previewPaneOpen={rightWorkspaceOpen}
-      studioChrome={studioModeEnabled}
       statusbarItems={statusbarItems}
       terminalPaneOpen={activeRightWorkspaceTab?.kind === 'terminal'}
       titlebarTools={titlebarToolGroups.flat.right}
