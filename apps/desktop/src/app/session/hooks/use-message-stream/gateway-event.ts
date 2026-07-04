@@ -542,7 +542,10 @@ export function useGatewayEventHandler(deps: GatewayEventDeps) {
       } else if (event.type === 'terminal.close') {
         // Agent closed its own read-only tab via the desktop-gated close_terminal tool.
         // The process is untouched — this only drops the view.
-        closeAgentTerminalByProc(payload?.process_id ?? '')
+        const closePayload = (payload ?? {}) as Record<string, unknown>
+        const closeId = closePayload.process_id ?? closePayload.id ?? closePayload.terminal_id
+
+        closeAgentTerminalByProc(typeof closeId === 'string' ? closeId : '')
       } else if (event.type === 'status.update') {
         if (sessionId && payload?.kind === 'compacting') {
           setSessionCompacting(sessionId, true)

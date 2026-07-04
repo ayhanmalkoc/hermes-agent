@@ -372,7 +372,8 @@ export function closeTerminal(id: string): void {
  *  it from auto-resurfacing, and the status-stack row can reopen it on demand.
  *  No-op when no such tab exists. */
 export function closeAgentTerminalByProc(procId: string): boolean {
-  const term = $terminals.get().find(t => t.kind === 'agent' && t.procId === procId)
+  const id = procId.trim()
+  const term = $terminals.get().find(t => t.kind === 'agent' && (t.procId === id || t.id === id))
 
   if (!term) {
     return false
