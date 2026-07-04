@@ -141,8 +141,8 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="robot" {...props} />,
     action: 'new-session'
   },
-  { id: 'agents', label: '', icon: props => <Codicon name="hubot" {...props} />, route: AGENTS_ROUTE },
-  { id: 'teams', label: '', icon: props => <Codicon name="organization" {...props} />, route: TEAMS_ROUTE },
+  { id: 'teams', label: 'Teams', icon: props => <Codicon name="organization" {...props} />, route: TEAMS_ROUTE },
+  { id: 'agents', label: 'Agents', icon: props => <Codicon name="hubot" {...props} />, route: AGENTS_ROUTE },
   {
     id: 'skills',
     label: '',
@@ -1414,8 +1414,8 @@ export function ChatSidebar({
 
         {contentVisible && (
           <div className="shrink-0 space-y-1 px-0.5 pb-1 pt-0.5">
-            {studioModeEnabled && studioQuickActions.length > 0 && <StudioSidebarQuickActions items={studioQuickActions} />}
             <ProfileRail />
+            {studioModeEnabled && studioQuickActions.length > 0 && <StudioSidebarQuickActions items={studioQuickActions} />}
           </div>
         )}
       </SidebarContent>
