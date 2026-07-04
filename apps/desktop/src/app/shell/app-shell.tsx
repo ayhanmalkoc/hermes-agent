@@ -137,6 +137,7 @@ export function AppShell({
   const SYSTEM_TOOL_COUNT = 4
   const paneToolCount = titlebarTools?.filter(tool => !tool.hidden).length ?? 0
   const systemToolsWidth = `calc(${SYSTEM_TOOL_COUNT} * (var(--titlebar-control-size) + 0.25rem))`
+  const leftTitlebarToolCount = studioChrome ? 3 : 2
 
   const rightWorkspaceWidth =
     rightWorkspaceWidthOverride !== undefined ? `${rightWorkspaceWidthOverride}px` : '34rem'
@@ -208,7 +209,10 @@ export function AppShell({
           />
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute top-0 z-1 h-(--titlebar-height) left-[calc(var(--titlebar-controls-left)+(var(--titlebar-control-size)*2)+0.75rem)] right-[calc(var(--titlebar-tools-right)+var(--titlebar-tools-width)+0.75rem)] [-webkit-app-region:drag]"
+            className="pointer-events-none absolute top-0 z-1 h-(--titlebar-height) right-[calc(var(--titlebar-tools-right)+var(--titlebar-tools-width)+0.75rem)] [-webkit-app-region:drag]"
+            style={{
+              left: `calc(var(--titlebar-controls-left) + (${leftTitlebarToolCount} * var(--titlebar-control-size)) + (${leftTitlebarToolCount - 1} * 0.25rem) + 0.75rem)`
+            }}
           />
 
           {children}

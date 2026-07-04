@@ -90,7 +90,6 @@ export function TitlebarControls({ leftTools = [], studioChrome = false, tools =
     {
       icon: <Codicon name="arrow-swap" />,
       id: 'flip-panes',
-      hidden: studioChrome,
       label: t.titlebar.swapSidebarSides,
       onSelect: () => {
         triggerHaptic('tap')
