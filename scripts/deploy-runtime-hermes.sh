@@ -33,8 +33,9 @@ npm --workspace apps/desktop run build
 log "pre-install ownership guard"
 chown -R "$RUNTIME_USER:$RUNTIME_GROUP" "$RUNTIME_VENV"
 
-log "install hermes-agent into runtime venv as $RUNTIME_USER"
-runuser -u "$RUNTIME_USER" -- "$PYTHON_BIN" -m pip install "$REPO_ROOT"
+log "install hermes-agent into runtime venv"
+umask 022
+"$PYTHON_BIN" -m pip install "$REPO_ROOT"
 
 log "post-install permission guard"
 chown -R "$RUNTIME_USER:$RUNTIME_GROUP" "$RUNTIME_VENV"
@@ -61,18 +62,29 @@ runuser -u "$RUNTIME_USER" -- "$PYTHON_BIN" - <<'PY'
 import urllib.request
 
 urls = [
-    "http://100.107.234.45:9119/",
-    "http://100.107.234.45:8642/health",
+    ("http://100.107.234.45:9119/", {200, 302, 401}),
+    ("http://100.107.234.45:8642/health", {200}),
 ]
 
-for url in urls:
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+opener = urllib.request.build_opener(NoRedirect)
+
+for url, ok_statuses in urls:
     try:
-        response = urllib.request.urlopen(url, timeout=5)
+        response = opener.open(url, timeout=5)
         print(f"{url} -> {response.status}")
+        if response.status not in ok_statuses:
+            raise SystemExit(f"unexpected status for {url}: {response.status}")
+    except urllib.error.HTTPError as exc:
+        print(f"{url} -> {exc.code}")
+        if exc.code not in ok_statuses:
+            raise
     except Exception as exc:
         print(f"{url} -> {type(exc).__name__}: {exc}")
         raise
 PY
 
 log "done"
-
