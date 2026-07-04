@@ -57,6 +57,7 @@ import {
 } from '../store/profile'
 import { $startWorkSessionRequest, followActiveSessionCwd, resolveNewSessionCwd } from '../store/projects'
 import { $reviewOpen } from '../store/review'
+import { $studioModeEnabled } from '../store/studio'
 import {
   $activeSessionId,
   $connection,
@@ -168,6 +169,7 @@ export function DesktopController() {
   const reviewOpen = useStore($reviewOpen)
   const rightWorkspacePaneOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const panesFlipped = useStore($panesFlipped)
+  const studioModeEnabled = useStore($studioModeEnabled)
   const profileScope = useStore($profileScope)
   // Below SIDEBAR_COLLAPSE_BREAKPOINT_PX there's no room for a docked rail —
   // collapse both sidebars (without touching their stored open state) so the
@@ -1116,6 +1118,7 @@ export function DesktopController() {
       onOpenSettings={openSettings}
       overlays={overlays}
       previewPaneOpen={rightWorkspaceOpen}
+      studioChrome={studioModeEnabled}
       statusbarItems={statusbarItems}
       terminalPaneOpen={activeRightWorkspaceTab?.kind === 'terminal'}
       titlebarTools={titlebarToolGroups.flat.right}

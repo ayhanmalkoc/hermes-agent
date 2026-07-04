@@ -40,6 +40,7 @@ interface AppShellProps {
   // force-collapse to hover-reveal overlays — so they cover the top-left traffic
   // lights (and zero the titlebar inset) even below the collapse breakpoint.
   previewPaneOpen?: boolean
+  studioChrome?: boolean
   statusbarItems?: readonly StatusbarItem[]
   terminalPaneOpen?: boolean
   titlebarTools?: readonly TitlebarTool[]
@@ -68,6 +69,7 @@ export function AppShell({
   onOpenSettings,
   overlays,
   previewPaneOpen = false,
+  studioChrome = false,
   statusbarItems,
   terminalPaneOpen = false,
   titlebarTools
@@ -183,7 +185,12 @@ export function AppShell({
       }
     >
       {!hideTitlebarControls && (
-        <TitlebarControls leftTools={leftTitlebarTools} onOpenSettings={onOpenSettings} tools={titlebarTools} />
+        <TitlebarControls
+          leftTools={leftTitlebarTools}
+          onOpenSettings={onOpenSettings}
+          studioChrome={studioChrome}
+          tools={titlebarTools}
+        />
       )}
 
       {nativeOverlayWidth > 0 && (
@@ -214,7 +221,9 @@ export function AppShell({
 
         {/* The compact pop-out drops the statusbar — it's a scratch window, not
             the full shell. */}
-        {!isSecondaryWindow() && <StatusbarControls items={statusbarItems} leftItems={leftStatusbarItems} />}
+        {!isSecondaryWindow() && !studioChrome && (
+          <StatusbarControls items={statusbarItems} leftItems={leftStatusbarItems} />
+        )}
       </main>
 
       {overlays}
@@ -232,4 +241,3 @@ export function AppShell({
     </SidebarProvider>
   )
 }
-
