@@ -174,12 +174,23 @@ describe('desktop filesystem facade', () => {
     expect(selectPaths).not.toHaveBeenCalled()
   })
 
+  it('uses the local OS picker for files in remote mode', async () => {
+    const remoteSelect = vi.fn(async () => ['/remote/project'])
+    $connection.set({ mode: 'remote' } as never)
+    setDesktopFsRemotePicker({ selectPaths: remoteSelect })
+    selectPaths.mockResolvedValue(['/local/file.txt'])
+
+    await expect(selectDesktopPaths({ directories: false, multiple: false })).resolves.toEqual(['/local/file.txt'])
+
+    expect(selectPaths).toHaveBeenCalledWith({ directories: false, multiple: false })
+    expect(remoteSelect).not.toHaveBeenCalled()
+  })
+
   it('limits the remote picker to single-directory selection', async () => {
     const remoteSelect = vi.fn(async () => ['/remote/project'])
     $connection.set({ mode: 'remote' } as never)
     setDesktopFsRemotePicker({ selectPaths: remoteSelect })
 
-    await expect(selectDesktopPaths({ directories: false, multiple: false })).resolves.toEqual([])
     await expect(selectDesktopPaths({ directories: true })).resolves.toEqual(['/remote/project'])
 
     expect(remoteSelect).toHaveBeenCalledWith({ directories: true, multiple: false })
