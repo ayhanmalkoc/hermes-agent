@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import type { HermesConnection } from '@/global'
 import type { HermesGateway } from '@/hermes'
 import { $backgroundStatusBySession } from '@/store/composer-status'
+import { $activeSessionId } from '@/store/session'
 
 import { seedAgentTerminalCommand, syncAgentTerminalSnapshot } from './agent-terminal-stream'
 import { setActiveTerminalId } from './buffer'
@@ -24,6 +25,7 @@ export function TerminalWorkspace({ connection, gateway, onAddSelectionToChat }:
   const terminals = useStore($terminals)
   const activeId = useStore($activeTerminalId)
   const background = useStore($backgroundStatusBySession)
+  const activeSessionId = useStore($activeSessionId)
 
   // Mirror the tab selection into the agent reader (read_terminal reads it).
   useEffect(() => {
@@ -39,14 +41,14 @@ export function TerminalWorkspace({ connection, gateway, onAddSelectionToChat }:
   // Live chunks stream via agent.terminal.output; the process-list snapshot also
   // seeds/falls back so the tab never stays blank if the stream races startup.
   useEffect(() => {
-    for (const list of Object.values(background)) {
-      for (const item of list) {
-        ensureAgentTerminal(item.id, item.title)
-        seedAgentTerminalCommand(item.id, item.title)
-        syncAgentTerminalSnapshot(item.id, item.output ?? '')
-      }
+    const list = activeSessionId ? (background[activeSessionId] ?? []) : []
+
+    for (const item of list) {
+      ensureAgentTerminal(item.id, item.title)
+      seedAgentTerminalCommand(item.id, item.title)
+      syncAgentTerminalSnapshot(item.id, item.output ?? '')
     }
-  }, [background])
+  }, [activeSessionId, background])
 
   return (
     <>

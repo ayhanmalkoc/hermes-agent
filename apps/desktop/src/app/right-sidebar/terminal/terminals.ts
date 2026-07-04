@@ -271,6 +271,7 @@ export function ensureAgentTerminal(procId: string, title: string): string | nul
   const existing = findByProc(procId)
 
   if (existing) {
+    openTerminalWorkspaceForTerminal(existing.id, title || existing.title || 'agent', false)
     return existing.id
   }
 
