@@ -8,6 +8,7 @@ export const ARTIFACTS_ROUTE = '/artifacts'
 export const CRON_ROUTE = '/cron'
 export const PROFILES_ROUTE = '/profiles'
 export const AGENTS_ROUTE = '/agents'
+export const TEAMS_ROUTE = '/teams'
 export const STARMAP_ROUTE = '/starmap'
 
 export type AppView =
@@ -21,6 +22,7 @@ export type AppView =
   | 'settings'
   | 'skills'
   | 'starmap'
+  | 'teams'
 
 export type AppRouteId =
   | 'agents'
@@ -33,6 +35,7 @@ export type AppRouteId =
   | 'settings'
   | 'skills'
   | 'starmap'
+  | 'teams'
 
 export interface AppRoute {
   id: AppRouteId
@@ -50,6 +53,7 @@ export const APP_ROUTES = [
   { id: 'cron', path: CRON_ROUTE, view: 'cron' },
   { id: 'profiles', path: PROFILES_ROUTE, view: 'profiles' },
   { id: 'agents', path: AGENTS_ROUTE, view: 'agents' },
+  { id: 'teams', path: TEAMS_ROUTE, view: 'teams' },
   { id: 'starmap', path: STARMAP_ROUTE, view: 'starmap' }
 ] as const satisfies readonly AppRoute[]
 

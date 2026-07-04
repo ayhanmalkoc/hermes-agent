@@ -3,10 +3,12 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { KbdGroup } from '@/components/ui/kbd'
 import { SearchField } from '@/components/ui/search-field'
@@ -27,6 +29,7 @@ import { sessionMatchesSearch } from '@/lib/session-search'
 import { normalizeSessionSource, sessionSourceLabel } from '@/lib/session-source'
 import { cn } from '@/lib/utils'
 import { $cronJobs } from '@/store/cron'
+import { $studioModeEnabled } from '@/store/studio'
 import {
   $dismissedAutoProjectIds,
   $panesFlipped,
@@ -95,7 +98,8 @@ import {
   setCurrentCwd
 } from '@/store/session'
 
-import { type AppView, ARTIFACTS_ROUTE, MESSAGING_ROUTE, SKILLS_ROUTE } from '../../routes'
+import { type AppView, AGENTS_ROUTE, ARTIFACTS_ROUTE, MESSAGING_ROUTE, SKILLS_ROUTE, TEAMS_ROUTE } from '../../routes'
+import type { StatusbarItem } from '../../shell/statusbar-controls'
 import type { SidebarNavItem } from '../../types'
 
 import { countLabel } from './chrome'
@@ -137,6 +141,8 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
     icon: props => <Codicon name="robot" {...props} />,
     action: 'new-session'
   },
+  { id: 'agents', label: '', icon: props => <Codicon name="hubot" {...props} />, route: AGENTS_ROUTE },
+  { id: 'teams', label: '', icon: props => <Codicon name="organization" {...props} />, route: TEAMS_ROUTE },
   {
     id: 'skills',
     label: '',
@@ -211,6 +217,7 @@ interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   onNewSessionInWorkspace: (path: null | string) => void
   onManageCronJob: (jobId: string) => void
   onTriggerCronJob: (jobId: string) => void
+  studioQuickActions?: readonly StatusbarItem[]
 }
 
 export function ChatSidebar({
@@ -225,7 +232,8 @@ export function ChatSidebar({
   onBranchSession,
   onNewSessionInWorkspace,
   onManageCronJob,
-  onTriggerCronJob
+  onTriggerCronJob,
+  studioQuickActions = []
 }: ChatSidebarProps) {
   const { t } = useI18n()
   const s = t.sidebar
@@ -233,6 +241,14 @@ export function ChatSidebar({
   // Collapsed-but-overlay-mounted → render the full sidebar, not just the nav rail.
   const overlayMounted = useStore($sidebarOverlayMounted)
   const contentVisible = sidebarOpen || overlayMounted
+  const studioModeEnabled = useStore($studioModeEnabled)
+  const visibleNavItems = useMemo(
+    () =>
+      studioModeEnabled
+        ? SIDEBAR_NAV.filter(item => ['new-session', 'teams', 'agents', 'artifacts'].includes(item.id))
+        : SIDEBAR_NAV,
+    [studioModeEnabled]
+  )
   const panesFlipped = useStore($panesFlipped)
   const agentsGrouped = useStore($sidebarAgentsGrouped)
   const pinnedSessionIds = useStore($pinnedSessionIds)
@@ -1047,12 +1063,14 @@ export function ChatSidebar({
         <SidebarGroup className="shrink-0 p-0 pb-2 pt-[calc(var(--titlebar-height)+0.375rem)]">
           <SidebarGroupContent>
             <SidebarMenu className="gap-px">
-              {SIDEBAR_NAV.map(item => {
+              {visibleNavItems.map(item => {
                 const isInteractive = Boolean(item.action) || Boolean(item.route)
 
                 const active =
                   (item.id === 'skills' && currentView === 'skills') ||
                   (item.id === 'messaging' && currentView === 'messaging') ||
+                  (item.id === 'agents' && currentView === 'agents') ||
+                  (item.id === 'teams' && currentView === 'teams') ||
                   (item.id === 'artifacts' && currentView === 'artifacts')
 
                 const isNewSession = item.id === 'new-session'
@@ -1395,7 +1413,8 @@ export function ChatSidebar({
         {contentVisible && !showSessionSections && <SidebarBlankState onNewProject={openProjectCreate} />}
 
         {contentVisible && (
-          <div className="shrink-0 px-0.5 pb-1 pt-0.5">
+          <div className="shrink-0 space-y-1 px-0.5 pb-1 pt-0.5">
+            {studioModeEnabled && studioQuickActions.length > 0 && <StudioSidebarQuickActions items={studioQuickActions} />}
             <ProfileRail />
           </div>
         )}
@@ -1403,6 +1422,70 @@ export function ChatSidebar({
       <ProjectDialog />
     </Sidebar>
   )
+}
+
+function StudioSidebarQuickActions({ items }: { items: readonly StatusbarItem[] }) {
+  const navigate = useNavigate()
+  const actions = items.filter(item => ['command-center', 'gateway-health', 'agents', 'cron'].includes(item.id) && !item.hidden)
+
+  if (actions.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-1 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-control-background) px-1 py-1">
+      {actions.map(item => (
+        <StudioSidebarQuickAction item={item} key={item.id} navigate={navigate} />
+      ))}
+    </div>
+  )
+}
+
+function StudioSidebarQuickAction({
+  item,
+  navigate
+}: {
+  item: StatusbarItem
+  navigate: ReturnType<typeof useNavigate>
+}) {
+  const [open, setOpen] = useState(false)
+  const label = String(item.title ?? item.label ?? item.id)
+  const button = (
+    <Button
+      aria-label={label}
+      className={cn(
+        'size-7 text-(--ui-text-tertiary) hover:bg-(--ui-control-hover-background) hover:text-foreground',
+        item.className
+      )}
+      disabled={item.disabled}
+      onClick={() => {
+        if (item.to) {
+          navigate(item.to)
+        }
+
+        item.onSelect?.({ shiftKey: false })
+      }}
+      size="icon-sm"
+      title={label}
+      type="button"
+      variant="ghost"
+    >
+      {item.icon}
+    </Button>
+  )
+
+  if (item.variant === 'menu' && item.menuContent) {
+    return (
+      <DropdownMenu onOpenChange={setOpen} open={open}>
+        <DropdownMenuTrigger asChild>{button}</DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className={cn('w-72 p-0', item.menuClassName)} side="top" sideOffset={8}>
+          {typeof item.menuContent === 'function' ? item.menuContent(() => setOpen(false)) : item.menuContent}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    )
+  }
+
+  return button
 }
 
 interface MessagingSection {

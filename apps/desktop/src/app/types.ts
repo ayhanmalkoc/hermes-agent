@@ -122,7 +122,16 @@ export type CommandDispatchResponse =
   | SendCommandDispatchResponse
   | PrefillCommandDispatchResponse
 
-export type SidebarNavId = 'artifacts' | 'command-center' | 'messaging' | 'new-session' | 'settings' | 'skills' | 'studio'
+export type SidebarNavId =
+  | 'agents'
+  | 'artifacts'
+  | 'command-center'
+  | 'messaging'
+  | 'new-session'
+  | 'settings'
+  | 'skills'
+  | 'studio'
+  | 'teams'
 
 export interface SidebarNavItem {
   id: SidebarNavId

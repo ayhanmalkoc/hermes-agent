@@ -212,6 +212,7 @@ export const en: Translations = {
       'nav.artifacts': 'Open artifacts',
       'nav.cron': 'Open scheduled jobs',
       'nav.agents': 'Open agents',
+      'nav.teams': 'Open teams',
       'session.new': 'New session',
       'session.newWindow': 'New session in window',
       'session.next': 'Next session',

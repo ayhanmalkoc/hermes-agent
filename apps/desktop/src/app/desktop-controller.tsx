@@ -137,6 +137,7 @@ const MessagingView = lazy(async () => ({ default: (await import('./messaging'))
 const ProfilesView = lazy(async () => ({ default: (await import('./profiles')).ProfilesView }))
 const SettingsView = lazy(async () => ({ default: (await import('./settings')).SettingsView }))
 const SkillsView = lazy(async () => ({ default: (await import('./skills')).SkillsView }))
+const TeamsView = lazy(async () => ({ default: (await import('./teams')).TeamsView }))
 
 // Latest cron-job sessions surfaced in the collapsed "Cron jobs" section. The
 // Cron sessions are written by a background scheduler tick (the desktop
@@ -942,6 +943,7 @@ export function DesktopController() {
           .then(() => refreshCronJobs())
           .catch(() => undefined)
       }}
+      studioQuickActions={leftStatusbarItems}
     />
   )
 
@@ -1170,6 +1172,14 @@ export function DesktopController() {
           <Route element={null} path="settings" />
           <Route element={null} path="command-center" />
           <Route element={null} path="agents" />
+          <Route
+            element={
+              <Suspense fallback={null}>
+                <TeamsView />
+              </Suspense>
+            }
+            path="teams"
+          />
           <Route element={<Navigate replace to={NEW_CHAT_ROUTE} />} path="new" />
           <Route element={<LegacySessionRedirect />} path="sessions/:sessionId" />
           <Route element={<Navigate replace to={NEW_CHAT_ROUTE} />} path="*" />
