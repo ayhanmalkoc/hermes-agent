@@ -1,7 +1,11 @@
 import { useStore } from '@nanostores/react'
+import { useQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
+import { getToolsets } from '@/hermes'
+import { isDesktopToolsetVisible } from '@/lib/desktop-toolsets'
 import { cn } from '@/lib/utils'
+import { $yoloActive, setYoloActive } from '@/store/session'
 import {
   $studioAgents,
   $studioModeEnabled,
@@ -9,6 +13,7 @@ import {
   $studioTeams,
   selectStudioAgent,
   selectStudioTeam,
+  setStudioToolset,
   toggleStudioGoal
 } from '@/store/studio'
 
@@ -28,7 +33,7 @@ function SelectChip({
       <span className="shrink-0 text-(--ui-text-tertiary)">{label}</span>
       <select
         aria-label={label}
-        className="min-w-0 max-w-32 bg-transparent text-foreground outline-none"
+        className="min-w-0 max-w-36 bg-transparent text-foreground outline-none"
         onChange={event => onChange(event.target.value || undefined)}
         value={value ?? ''}
       >
@@ -43,15 +48,32 @@ function SelectChip({
   )
 }
 
+function toolsetName(label: unknown, fallback: string): string {
+  return typeof label === 'string' && label.trim() ? label.replace(/^\p{Emoji_Presentation}\s*/u, '').trim() : fallback
+}
+
 export function StudioComposerChipBar() {
   const enabled = useStore($studioModeEnabled)
   const agents = useStore($studioAgents)
   const teams = useStore($studioTeams)
   const context = useStore($studioRunContext)
+  const yoloActive = useStore($yoloActive)
+
+  const toolsetOptions = useQuery({
+    enabled,
+    queryFn: () => getToolsets(),
+    queryKey: ['studio', 'toolsets'],
+    staleTime: 60_000
+  })
 
   if (!enabled) {
     return null
   }
+
+  const toolsets =
+    toolsetOptions.data
+      ?.filter(toolset => isDesktopToolsetVisible(toolset.name))
+      .map(toolset => ({ id: toolset.name, name: toolsetName(toolset.label, toolset.name) })) ?? []
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-surface-elevated-background)/70 px-2 py-1.5">
@@ -71,8 +93,17 @@ export function StudioComposerChipBar() {
       </Button>
       <SelectChip label="Team" onChange={selectStudioTeam} value={context.teamIds[0]} values={teams} />
       <SelectChip label="Agent" onChange={selectStudioAgent} value={context.activeAgentId} values={agents} />
-      {context.modelOverride && <span className="text-[0.68rem] text-(--ui-text-tertiary)">Model: {context.modelOverride}</span>}
-      {context.toolset && <span className="text-[0.68rem] text-(--ui-text-tertiary)">Toolset: {context.toolset}</span>}
+      <SelectChip label="Toolset" onChange={setStudioToolset} value={context.toolset} values={toolsets} />
+      <Button
+        aria-pressed={yoloActive}
+        className={cn('h-6 rounded-full px-2 text-[0.68rem]', yoloActive && 'border-amber-400/50 bg-amber-400/15 text-foreground')}
+        onClick={() => setYoloActive(!yoloActive)}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        YOLO {yoloActive ? 'on' : 'off'}
+      </Button>
     </div>
   )
 }

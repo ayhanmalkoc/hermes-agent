@@ -165,6 +165,10 @@ export function selectStudioAgent(agentId: string | undefined): void {
   })
 }
 
+export function setStudioToolset(toolset: string | undefined): void {
+  updateStudioRunContext({ toolset: toolset?.trim() || undefined })
+}
+
 function selectedLabels() {
   const state = $studioState.get()
   const context = state.runContext
