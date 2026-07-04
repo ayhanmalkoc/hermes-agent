@@ -7,10 +7,8 @@ import {
   $studioModeEnabled,
   $studioRunContext,
   $studioTeams,
-  $studioWorks,
   selectStudioAgent,
   selectStudioTeam,
-  selectStudioWork,
   toggleStudioGoal
 } from '@/store/studio'
 
@@ -49,9 +47,7 @@ export function StudioComposerChipBar() {
   const enabled = useStore($studioModeEnabled)
   const agents = useStore($studioAgents)
   const teams = useStore($studioTeams)
-  const works = useStore($studioWorks)
   const context = useStore($studioRunContext)
-  const workOptions = works.map(work => ({ id: work.id, name: work.title }))
 
   if (!enabled) {
     return null
@@ -60,7 +56,6 @@ export function StudioComposerChipBar() {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-surface-elevated-background)/70 px-2 py-1.5">
       <span className="shrink-0 text-[0.68rem] font-medium text-(--ui-text-tertiary)">Studio</span>
-      <SelectChip label="Work" onChange={selectStudioWork} value={context.workId} values={workOptions} />
       <Button
         aria-pressed={context.goalEnabled}
         className={cn(

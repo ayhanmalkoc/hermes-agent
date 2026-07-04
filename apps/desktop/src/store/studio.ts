@@ -28,17 +28,7 @@ export interface StudioTeam {
   defaultToolset?: string
 }
 
-export interface StudioWork {
-  id: string
-  title: string
-  sessionIds: string[]
-  projectCwd?: string
-  status: 'active' | 'paused' | 'done'
-  activeGoal?: string
-}
-
 export interface StudioRunContext {
-  workId?: string
   goalEnabled: boolean
   teamIds: string[]
   agentIds: string[]
@@ -51,7 +41,6 @@ interface StudioState {
   modeEnabled: boolean
   agents: StudioAgent[]
   teams: StudioTeam[]
-  works: StudioWork[]
   runContext: StudioRunContext
 }
 
@@ -89,15 +78,10 @@ const defaultTeams: StudioTeam[] = [
   }
 ]
 
-const defaultWorks: StudioWork[] = [
-  { id: 'studio-mvp', title: 'Studio Mode MVP', sessionIds: [], status: 'active' }
-]
-
 const defaultState: StudioState = {
   modeEnabled: false,
   agents: defaultAgents,
   teams: defaultTeams,
-  works: defaultWorks,
   runContext: { goalEnabled: false, teamIds: [], agentIds: [] }
 }
 
@@ -109,7 +93,6 @@ function normalizeState(value: unknown): StudioState {
     ...parsed,
     agents: Array.isArray(parsed.agents) && parsed.agents.length ? parsed.agents : defaultAgents,
     teams: Array.isArray(parsed.teams) && parsed.teams.length ? parsed.teams : defaultTeams,
-    works: Array.isArray(parsed.works) && parsed.works.length ? parsed.works : defaultWorks,
     runContext: { ...defaultState.runContext, ...(parsed.runContext ?? {}) }
   }
 }
@@ -138,7 +121,6 @@ export const $studioModeEnabled = computed($studioState, state => state.modeEnab
 export const $studioRunContext = computed($studioState, state => state.runContext)
 export const $studioAgents = computed($studioState, state => state.agents)
 export const $studioTeams = computed($studioState, state => state.teams)
-export const $studioWorks = computed($studioState, state => state.works)
 
 function updateStudioState(updater: (state: StudioState) => StudioState): void {
   const next = updater($studioState.get())
@@ -156,10 +138,6 @@ export function updateStudioRunContext(patch: Partial<StudioRunContext>): void {
 
 export function toggleStudioGoal(): void {
   updateStudioRunContext({ goalEnabled: !$studioState.get().runContext.goalEnabled })
-}
-
-export function selectStudioWork(workId: string | undefined): void {
-  updateStudioRunContext({ workId })
 }
 
 export function selectStudioTeam(teamId: string | undefined): void {
@@ -190,19 +168,17 @@ export function selectStudioAgent(agentId: string | undefined): void {
 function selectedLabels() {
   const state = $studioState.get()
   const context = state.runContext
-  const work = state.works.find(item => item.id === context.workId)
   const teams = context.teamIds.map(id => state.teams.find(item => item.id === id)?.name).filter(Boolean)
   const agents = context.agentIds.map(id => state.agents.find(item => item.id === id)?.name).filter(Boolean)
   const activeAgent = state.agents.find(item => item.id === context.activeAgentId)
 
-  return { activeAgent, agents, context, teams, work }
+  return { activeAgent, agents, context, teams }
 }
 
 export function studioContextBlock(): string {
-  const { activeAgent, agents, context, teams, work } = selectedLabels()
+  const { activeAgent, agents, context, teams } = selectedLabels()
   const lines = ['Studio context:']
 
-  if (work) lines.push(`- Work: ${work.title}`)
   if (context.goalEnabled) lines.push('- Goal mode: enabled')
   if (teams.length) lines.push(`- Team: ${teams.join(', ')}`)
   if (agents.length) lines.push(`- Agents: ${agents.join(', ')}`)
@@ -226,4 +202,3 @@ export function studioGoalCommand(text: string): string | null {
 
   return `/goal ${studioPromptText(text)}`
 }
-
