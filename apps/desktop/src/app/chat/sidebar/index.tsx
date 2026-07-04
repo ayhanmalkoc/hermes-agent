@@ -3,6 +3,7 @@ import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useStore } from '@nanostores/react'
 import type * as React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { PlatformAvatar } from '@/app/messaging/platform-icon'
 import { Button } from '@/components/ui/button'
@@ -94,8 +95,23 @@ import {
   sessionPinId,
   setCurrentCwd
 } from '@/store/session'
+import {
+  $studioActiveView,
+  $studioModeEnabled,
+  exitStudioMode,
+  setStudioActiveView,
+  type StudioActiveView
+} from '@/store/studio'
 
-import { type AppView, ARTIFACTS_ROUTE, MESSAGING_ROUTE, SKILLS_ROUTE, STUDIO_ROUTE } from '../../routes'
+import {
+  type AppView,
+  ARTIFACTS_ROUTE,
+  COMMAND_CENTER_ROUTE,
+  MESSAGING_ROUTE,
+  SETTINGS_ROUTE,
+  SKILLS_ROUTE,
+  STUDIO_ROUTE
+} from '../../routes'
 import type { SidebarNavItem } from '../../types'
 
 import { countLabel } from './chrome'
@@ -146,6 +162,15 @@ const SIDEBAR_NAV: SidebarNavItem[] = [
   },
   { id: 'messaging', label: '', icon: props => <Codicon name="comment" {...props} />, route: MESSAGING_ROUTE },
   { id: 'artifacts', label: '', icon: props => <Codicon name="files" {...props} />, route: ARTIFACTS_ROUTE }
+]
+
+const STUDIO_NAV: { id: StudioActiveView; label: string; icon: string }[] = [
+  { id: 'cockpit', label: 'Cockpit', icon: 'dashboard' },
+  { id: 'sessions', label: 'Oturumlar', icon: 'list-tree' },
+  { id: 'agents', label: 'Ajanlar', icon: 'hubot' },
+  { id: 'teams', label: 'Ekipler', icon: 'organization' },
+  { id: 'outputs', label: 'Çıktılar', icon: 'files' },
+  { id: 'automations', label: 'Automations', icon: 'calendar' }
 ]
 
 // Two modes via the `compact` height variant (styles.css):
@@ -229,8 +254,11 @@ export function ChatSidebar({
   onTriggerCronJob
 }: ChatSidebarProps) {
   const { t } = useI18n()
+  const navigate = useNavigate()
   const s = t.sidebar
   const sidebarOpen = useStore($sidebarOpen)
+  const studioModeEnabled = useStore($studioModeEnabled)
+  const studioActiveView = useStore($studioActiveView)
   // Collapsed-but-overlay-mounted → render the full sidebar, not just the nav rail.
   const overlayMounted = useStore($sidebarOverlayMounted)
   const contentVisible = sidebarOpen || overlayMounted
@@ -1112,6 +1140,35 @@ export function ChatSidebar({
           </SidebarGroupContent>
         </SidebarGroup>
 
+        {contentVisible && studioModeEnabled && (
+          <SidebarGroup className="shrink-0 border-b border-(--ui-stroke-tertiary) p-0 pb-2">
+            <SidebarGroupContent>
+              <div className="px-2 pb-1 text-[0.65rem] font-semibold uppercase tracking-[0.16em] text-(--ui-text-tertiary)">
+                Studio
+              </div>
+              <SidebarMenu className="gap-px">
+                {STUDIO_NAV.map(item => (
+                  <SidebarMenuItem key={item.id}>
+                    <SidebarMenuButton
+                      className={cn(
+                        'flex h-7 w-full justify-start gap-2 rounded-md border border-transparent px-2 text-left text-[0.8125rem] font-medium text-(--ui-text-secondary) transition-colors duration-100 ease-out [-webkit-app-region:no-drag] hover:bg-(--ui-control-hover-background) hover:text-foreground hover:transition-none',
+                        studioActiveView === item.id &&
+                          'border-(--ui-stroke-tertiary) bg-(--ui-control-active-background) text-foreground shadow-none hover:border-(--ui-stroke-tertiary)!'
+                      )}
+                      onClick={() => setStudioActiveView(item.id)}
+                      tooltip={item.label}
+                      type="button"
+                    >
+                      <Codicon className="size-4 shrink-0 text-[color-mix(in_srgb,currentColor_72%,transparent)]" name={item.icon} />
+                      <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
+
         {contentVisible && showSessionSections && (
           <div className="shrink-0 px-2 pb-1 pt-1">
             <SearchField
@@ -1398,12 +1455,35 @@ export function ChatSidebar({
 
         {contentVisible && (
           <div className="shrink-0 px-0.5 pb-1 pt-0.5">
+            {studioModeEnabled && (
+              <div className="mb-1 grid gap-px px-1">
+                <StudioUtilityButton icon="terminal-cmd" label="Command Center" onClick={() => navigate(COMMAND_CENTER_ROUTE)} />
+                <StudioUtilityButton icon="radio-tower" label="Gateway" onClick={() => navigate(MESSAGING_ROUTE)} />
+                <StudioUtilityButton icon="settings-gear" label="Settings" onClick={() => navigate(SETTINGS_ROUTE)} />
+                <StudioUtilityButton icon="sign-out" label="Exit Studio" onClick={exitStudioMode} />
+              </div>
+            )}
             <ProfileRail />
           </div>
         )}
       </SidebarContent>
       <ProjectDialog />
     </Sidebar>
+  )
+}
+
+function StudioUtilityButton({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <Button
+      className="h-7 justify-start gap-2 rounded-md px-2 text-[0.75rem] text-(--ui-text-secondary) hover:text-foreground"
+      onClick={onClick}
+      size="sm"
+      type="button"
+      variant="ghost"
+    >
+      <Codicon className="size-4" name={icon} />
+      <span className="truncate">{label}</span>
+    </Button>
   )
 }
 

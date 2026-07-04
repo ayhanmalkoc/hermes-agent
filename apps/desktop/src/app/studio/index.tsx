@@ -7,7 +7,6 @@ import {
   $studioModeEnabled,
   $studioRunContext,
   $studioTeams,
-  $studioWorks,
   setStudioModeEnabled,
   toggleStudioGoal
 } from '@/store/studio'
@@ -16,7 +15,6 @@ export function StudioView() {
   const enabled = useStore($studioModeEnabled)
   const agents = useStore($studioAgents)
   const teams = useStore($studioTeams)
-  const works = useStore($studioWorks)
   const context = useStore($studioRunContext)
 
   return (
@@ -40,7 +38,7 @@ export function StudioView() {
       <div className="grid min-h-0 flex-1 gap-4 overflow-auto p-6 lg:grid-cols-3">
         <StudioCard title="Start Surface">
           <p className="text-sm text-(--ui-text-secondary)">
-            Use the normal chat composer. Studio adds Work, Goal, Team, Agent, Model, and Toolset chips above the
+            Use the normal chat composer. Studio adds Goal, Team, Agent, Model, Toolset, and YOLO chips above the
             existing input.
           </p>
           <div className="mt-4 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-surface-elevated-background) p-3 text-xs text-(--ui-text-secondary)">
@@ -73,15 +71,10 @@ export function StudioView() {
           ))}
         </StudioCard>
 
-        <StudioCard title="Works">
-          {works.map(work => (
-            <div key={work.id} className="rounded-lg border border-(--ui-stroke-tertiary) p-3">
-              <div className="text-sm font-medium">{work.title}</div>
-              <div className="mt-1 text-xs text-(--ui-text-tertiary)">
-                {work.status} · {work.sessionIds.length} sessions
-              </div>
-            </div>
-          ))}
+        <StudioCard title="Sessions">
+          <p className="text-sm text-(--ui-text-secondary)">
+            Studio uses the existing Hermes session list and project/workspace grouping. No extra work layer is added.
+          </p>
         </StudioCard>
 
         <StudioCard title="Runtime Contract">

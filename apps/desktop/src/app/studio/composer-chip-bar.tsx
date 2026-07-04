@@ -7,10 +7,10 @@ import {
   $studioModeEnabled,
   $studioRunContext,
   $studioTeams,
-  $studioWorks,
   selectStudioAgent,
   selectStudioTeam,
-  selectStudioWork,
+  setStudioModelOverride,
+  setStudioToolset,
   toggleStudioGoal
 } from '@/store/studio'
 
@@ -49,9 +49,7 @@ export function StudioComposerChipBar() {
   const enabled = useStore($studioModeEnabled)
   const agents = useStore($studioAgents)
   const teams = useStore($studioTeams)
-  const works = useStore($studioWorks)
   const context = useStore($studioRunContext)
-  const workOptions = works.map(work => ({ id: work.id, name: work.title }))
 
   if (!enabled) {
     return null
@@ -60,7 +58,6 @@ export function StudioComposerChipBar() {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1.5 rounded-lg border border-(--ui-stroke-tertiary) bg-(--ui-surface-elevated-background)/70 px-2 py-1.5">
       <span className="shrink-0 text-[0.68rem] font-medium text-(--ui-text-tertiary)">Studio</span>
-      <SelectChip label="Work" onChange={selectStudioWork} value={context.workId} values={workOptions} />
       <Button
         aria-pressed={context.goalEnabled}
         className={cn(
@@ -76,8 +73,23 @@ export function StudioComposerChipBar() {
       </Button>
       <SelectChip label="Team" onChange={selectStudioTeam} value={context.teamIds[0]} values={teams} />
       <SelectChip label="Agent" onChange={selectStudioAgent} value={context.activeAgentId} values={agents} />
-      {context.modelOverride && <span className="text-[0.68rem] text-(--ui-text-tertiary)">Model: {context.modelOverride}</span>}
-      {context.toolset && <span className="text-[0.68rem] text-(--ui-text-tertiary)">Toolset: {context.toolset}</span>}
+      <input
+        aria-label="Model"
+        className="h-6 w-24 rounded-full border border-(--ui-stroke-tertiary) bg-(--ui-control-background) px-2 text-[0.68rem] outline-none placeholder:text-(--ui-text-tertiary)"
+        onChange={event => setStudioModelOverride(event.target.value)}
+        placeholder="Model"
+        value={context.modelOverride ?? ''}
+      />
+      <input
+        aria-label="Toolset"
+        className="h-6 w-24 rounded-full border border-(--ui-stroke-tertiary) bg-(--ui-control-background) px-2 text-[0.68rem] outline-none placeholder:text-(--ui-text-tertiary)"
+        onChange={event => setStudioToolset(event.target.value)}
+        placeholder="Toolset"
+        value={context.toolset ?? ''}
+      />
+      <Button className="h-6 rounded-full px-2 text-[0.68rem]" size="sm" type="button" variant="outline">
+        YOLO
+      </Button>
     </div>
   )
 }
