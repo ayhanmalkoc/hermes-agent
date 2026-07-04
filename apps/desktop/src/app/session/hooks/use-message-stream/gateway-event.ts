@@ -540,8 +540,8 @@ export function useGatewayEventHandler(deps: GatewayEventDeps) {
         // Live chunk from a background process → its read-only agent terminal tab.
         writeAgentTerminalChunk(payload?.process_id ?? '', payload?.chunk ?? '')
       } else if (event.type === 'terminal.close') {
-        // Agent closed its own read-only tab via the desktop-gated close_terminal tool.
-        // The process is untouched — this only drops the view.
+        // Drop the read-only agent terminal tab after the backend has handled
+        // terminal close semantics (close_terminal kills first, then emits this).
         const closePayload = (payload ?? {}) as Record<string, unknown>
         const closeId = closePayload.process_id ?? closePayload.id ?? closePayload.terminal_id
 

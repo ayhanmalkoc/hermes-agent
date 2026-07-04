@@ -152,9 +152,9 @@ def test_request_close_terminal_without_sink_is_desktop_only_error(registry):
     assert "desktop" in result["error"].lower()
 
 
-def test_request_close_terminal_invokes_sink_without_killing(registry):
-    """With a sink wired, close routes (session, process_id) to the UI and leaves
-    the process running — close is a view drop, not a kill."""
+def test_request_close_terminal_invokes_view_sink_only(registry):
+    """The low-level close sink only routes (session, process_id) to the UI;
+    product-level terminal close paths are responsible for killing first."""
     s = _make_session(sid="proc_close_live")
     registry._running[s.id] = s
     calls = []
@@ -165,7 +165,7 @@ def test_request_close_terminal_invokes_sink_without_killing(registry):
     assert result["status"] == "ok"
     assert result["closed"] == "proc_close_live"
     assert calls == [(s, "proc_close_live")]
-    # Still tracked as running — closing the tab must not reap the process.
+    # Still tracked as running — this registry sink is only the UI close event.
     assert s.id in registry._running
 
 

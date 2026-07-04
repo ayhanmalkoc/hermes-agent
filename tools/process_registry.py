@@ -1516,10 +1516,10 @@ class ProcessRegistry:
         """Ask the desktop GUI to close the read-only terminal tab mirroring this
         background process.
 
-        This does NOT kill the process — it only drops the view. Output keeps
-        streaming into the (capped) buffer and the user can reopen the tab from
-        the status stack. Desktop-only: returns an error if no UI close sink is
-        wired (e.g. CLI / messaging)."""
+        This low-level sink only drops the view; product-level terminal close
+        paths call ``kill_process`` first when the terminal is still running.
+        Desktop-only: returns an error if no UI close sink is wired (e.g. CLI /
+        messaging)."""
         sink = self.on_close
         if sink is None:
             return {

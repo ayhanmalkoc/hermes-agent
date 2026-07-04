@@ -366,11 +366,9 @@ export function closeTerminal(id: string): void {
   }
 }
 
-/** Close the read-only agent tab mirroring a background process. The agent
- *  drives this via the desktop-gated `close_terminal` tool → `terminal.close`.
- *  The process is NOT killed — only the view is dropped; `surfacedProcs` keeps
- *  it from auto-resurfacing, and the status-stack row can reopen it on demand.
- *  No-op when no such tab exists. */
+/** Close the read-only agent tab mirroring a background process. Product-level
+ *  terminal closes kill first, then emit `terminal.close`; this renderer helper
+ *  only drops the mirrored tab and keeps it from auto-resurfacing. */
 export function closeAgentTerminalByProc(procId: string): boolean {
   const id = procId.trim()
   const term = $terminals.get().find(t => t.kind === 'agent' && (t.procId === id || t.id === id))
