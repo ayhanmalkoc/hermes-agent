@@ -8,6 +8,7 @@ import {
   useRef
 } from 'react'
 
+import { StudioComposerChipBar } from '@/app/studio/composer-chip-bar'
 import { composerFill, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
@@ -947,6 +948,7 @@ export function ChatBar({
               >
                 <VoiceActivity state={voiceActivityState} />
                 <VoicePlaybackActivity />
+                <StudioComposerChipBar />
                 {queueEdit && editingQueuedPrompt && (
                   <div className="flex items-center justify-between gap-2 rounded-lg border border-[color-mix(in_srgb,var(--dt-composer-ring)_32%,transparent)] bg-accent/18 px-2 py-1">
                     <div className="min-w-0 text-[0.7rem] text-muted-foreground/88">

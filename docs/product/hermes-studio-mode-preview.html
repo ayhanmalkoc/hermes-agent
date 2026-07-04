@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hermes Studio Mode Preview</title>
+  <style>
+    :root {
+      --bg:#07080c; --panel:#10131b; --panel2:#151a24; --line:#242b3a;
+      --text:#eef2ff; --muted:#8f9bb3; --soft:#c7d2fe; --accent:#8b5cf6;
+      --accent2:#22d3ee; --ok:#34d399; --warn:#fbbf24; --bad:#fb7185;
+      --shadow:0 24px 80px rgba(0,0,0,.45); --r:18px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    *{box-sizing:border-box} body{margin:0;background:radial-gradient(circle at 20% 0%,#1c1640 0,#07080c 38%,#05060a 100%);color:var(--text)}
+    .app{height:100vh;display:grid;grid-template-columns:76px 270px 1fr 360px;gap:12px;padding:14px;overflow:hidden}
+    .rail,.sidebar,.main,.ops{background:linear-gradient(180deg,rgba(21,26,36,.92),rgba(12,15,22,.94));border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);min-height:0}
+    .rail{display:flex;flex-direction:column;align-items:center;padding:14px 8px;gap:12px}.logo{width:42px;height:42px;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;font-weight:900}.icon{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;color:var(--muted)}.icon.active{background:#22283a;color:white;border:1px solid #394157}.spacer{flex:1}.pill{font-size:11px;color:var(--ok);border:1px solid rgba(52,211,153,.35);padding:5px 8px;border-radius:999px}
+    .sidebar{padding:16px;display:flex;flex-direction:column;gap:14px}.topline{display:flex;align-items:center;justify-content:space-between}.title{font-size:18px;font-weight:750}.badge{font-size:11px;color:#ddd6fe;background:rgba(139,92,246,.16);border:1px solid rgba(139,92,246,.35);padding:5px 8px;border-radius:999px}.search{height:40px;border:1px solid var(--line);background:#0b0e15;border-radius:12px;color:var(--muted);display:flex;align-items:center;padding:0 12px;font-size:13px}.section{display:flex;flex-direction:column;gap:8px}.label{font-size:11px;text-transform:uppercase;letter-spacing:.11em;color:var(--muted)}.navitem{display:flex;align-items:center;justify-content:space-between;padding:10px 11px;border-radius:12px;color:#dbe4ff;font-size:14px}.navitem.active{background:rgba(139,92,246,.18);border:1px solid rgba(139,92,246,.36)}.count{color:var(--muted);font-size:12px}.card{background:rgba(255,255,255,.035);border:1px solid var(--line);border-radius:15px;padding:12px}.agentrow{display:flex;gap:10px;align-items:center;margin-top:9px}.avatar{width:30px;height:30px;border-radius:10px;background:#26304a;display:grid;place-items:center;font-size:12px;color:#dbeafe}.small{font-size:12px;color:var(--muted)}
+    .main{display:grid;grid-template-rows:auto auto 1fr auto;overflow:hidden}.header{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.hgroup h1{margin:0;font-size:22px}.hgroup p{margin:5px 0 0;color:var(--muted);font-size:13px}.actions{display:flex;gap:8px}.btn{border:1px solid var(--line);background:#111724;color:#e5e7eb;border-radius:12px;padding:10px 12px;font-size:13px}.btn.primary{background:linear-gradient(135deg,var(--accent),#4f46e5);border:0}.chips{padding:12px 18px;display:flex;gap:8px;flex-wrap:wrap;border-bottom:1px solid var(--line)}.chip{font-size:13px;color:#e0f2fe;border:1px solid rgba(34,211,238,.35);background:rgba(34,211,238,.09);border-radius:999px;padding:8px 11px}.chip.purple{color:#ede9fe;border-color:rgba(139,92,246,.38);background:rgba(139,92,246,.12)}.thread{padding:18px;overflow:auto;display:flex;flex-direction:column;gap:14px}.msg{max-width:78%;border:1px solid var(--line);border-radius:18px;padding:14px 15px;background:rgba(255,255,255,.04)}.msg.user{align-self:flex-end;background:rgba(139,92,246,.16);border-color:rgba(139,92,246,.4)}.msg .meta{font-size:11px;color:var(--muted);margin-bottom:6px}.msg p{margin:0;line-height:1.45}.toolgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:12px}.tool{border:1px solid var(--line);background:#0b0f18;border-radius:13px;padding:10px}.tool b{display:block;font-size:12px}.composer{padding:14px 18px;border-top:1px solid var(--line);display:flex;gap:10px}.input{flex:1;min-height:54px;border-radius:16px;border:1px solid #354057;background:#0b0e15;color:var(--text);padding:15px}.send{width:56px;border-radius:16px;border:0;background:linear-gradient(135deg,var(--accent2),var(--accent));color:white;font-weight:800}
+    .ops{padding:16px;display:flex;flex-direction:column;gap:14px;overflow:hidden}.ophead{display:flex;justify-content:space-between;align-items:center}.status{font-size:12px;color:var(--ok);display:flex;align-items:center;gap:7px}.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 18px var(--ok)}.timeline{display:flex;flex-direction:column;gap:10px;overflow:auto}.event{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.035);padding:11px}.event .row{display:flex;justify-content:space-between;gap:8px}.event b{font-size:13px}.event p{margin:6px 0 0;color:var(--muted);font-size:12px;line-height:1.35}.tag{font-size:10px;border-radius:999px;padding:3px 7px;border:1px solid var(--line);color:var(--muted)}.tag.ok{color:var(--ok);border-color:rgba(52,211,153,.4)}.tag.warn{color:var(--warn);border-color:rgba(251,191,36,.4)}.approval{border:1px solid rgba(251,191,36,.38);background:rgba(251,191,36,.08);border-radius:16px;padding:13px}.approval h3{margin:0 0 6px;font-size:14px}.approval p{margin:0 0 10px;color:var(--muted);font-size:12px}.split{display:grid;grid-template-columns:1fr 1fr;gap:8px}.mini{height:34px;border-radius:10px;border:1px solid var(--line);background:#111724;color:#fff}.mini.ok{background:rgba(52,211,153,.16);border-color:rgba(52,211,153,.36)}.mini.bad{background:rgba(251,113,133,.12);border-color:rgba(251,113,133,.36)}
+    @media(max-width:1200px){.app{grid-template-columns:70px 230px 1fr}.ops{display:none}.toolgrid{grid-template-columns:1fr}} 
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="rail">
+      <div class="logo">H</div><div class="icon active">◎</div><div class="icon">◫</div><div class="icon">☷</div><div class="icon">⚙</div><div class="spacer"></div><div class="pill">Studio</div>
+    </aside>
+    <aside class="sidebar">
+      <div class="topline"><div class="title">Hermes Studio</div><div class="badge">Experimental</div></div>
+      <div class="search">Ara: ajan, ekip, çalışma...</div>
+      <div class="section"><div class="label">Workspace</div><div class="navitem active">Cockpit <span class="count">live</span></div><div class="navitem">Oturumlar <span class="count">18</span></div><div class="navitem">Çalışmalar <span class="count">7</span></div><div class="navitem">Çıktılar <span class="count">42</span></div></div>
+      <div class="section"><div class="label">Organization</div><div class="navitem">Ekipler <span class="count">4</span></div><div class="navitem">Ajanlar <span class="count">12</span></div><div class="navitem">Yetenekler <span class="count">skills</span></div></div>
+      <div class="card"><div class="label">Aktif Ekip</div><div class="agentrow"><div class="avatar">LE</div><div><b>Launch Ekibi</b><div class="small">Lead + QA + Builder</div></div></div><div class="agentrow"><div class="avatar">QA</div><div><b>Test Ajanı</b><div class="small">approval bekliyor</div></div></div></div>
+    </aside>
+    <main class="main">
+      <div class="header"><div class="hgroup"><h1>Cockpit</h1><p>Chat-first görev başlatma, ekip/ajan context’iyle Hermes runtime.</p></div><div class="actions"><button class="btn">Yeni Oturum</button><button class="btn primary">Run Başlat</button></div></div>
+      <div class="chips"><div class="chip purple">Ekip: Launch Ekibi ×</div><div class="chip">Ajan: QA Ajanı ×</div><div class="chip">Model: gpt-5.5 ×</div><div class="chip">Toolset: Code + Browser ×</div><div class="chip purple">Work: Studio MVP ×</div></div>
+      <section class="thread">
+        <div class="msg user"><div class="meta">Sen · Studio context ile</div><p>Hermes Desktop içinde Studio Mode için ilk MVP ekranını kur, mevcut session ve approval akışını bozma.</p></div>
+        <div class="msg"><div class="meta">Hermes · Launch Ekibi</div><p>Görevi Studio run context’iyle aldım. Mevcut Desktop route yapısını kullanıp cockpit shell, composer chips ve Live Ops panelini bağlayacağım.</p><div class="toolgrid"><div class="tool"><b>Planner</b><span class="small">route plan ready</span></div><div class="tool"><b>Builder</b><span class="small">UI scaffold</span></div><div class="tool"><b>QA</b><span class="small">approval gate</span></div></div></div>
+        <div class="msg"><div class="meta">Hermes · Tool activity</div><p><b>Dosya değişikliği önerisi:</b> `apps/desktop/src/app/studio/*` altında izole Studio shell oluşturulacak.</p></div>
+      </section>
+      <div class="composer"><div class="input">Yeni görevi yaz...  @agent / #work / +artifact</div><button class="send">↗</button></div>
+    </main>
+    <aside class="ops">
+      <div class="ophead"><div><div class="label">Live Ops</div><div class="status"><span class="dot"></span> Run aktif</div></div><div class="badge">session: st-204</div></div>
+      <div class="approval"><h3>Onay gerekli</h3><p>Builder ajanı `apps/desktop/src/app/studio` altında yeni route dosyaları oluşturmak istiyor.</p><div class="split"><button class="mini bad">Reddet</button><button class="mini ok">Onayla</button></div></div>
+      <div class="timeline">
+        <div class="event"><div class="row"><b>Run başladı</b><span class="tag ok">done</span></div><p>Studio context: Launch Ekibi, QA Ajanı, gpt-5.5.</p></div>
+        <div class="event"><div class="row"><b>Planner</b><span class="tag ok">done</span></div><p>Mevcut Hermes surfaces eşlendi: sessions, approvals, subagents, artifacts.</p></div>
+        <div class="event"><div class="row"><b>Builder</b><span class="tag warn">waiting</span></div><p>Yeni Studio shell scaffold için onay bekliyor.</p></div>
+        <div class="event"><div class="row"><b>QA</b><span class="tag">queued</span></div><p>Approval sonrası route izolasyonu ve regression smoke test.</p></div>
+        <div class="event"><div class="row"><b>Output</b><span class="tag">artifact</span></div><p>Preview HTML, design matrix ve implementation plan Outputs’a bağlandı.</p></div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

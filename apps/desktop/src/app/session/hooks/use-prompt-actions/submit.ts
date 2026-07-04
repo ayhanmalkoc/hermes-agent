@@ -14,6 +14,7 @@ import {
 import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
 import { setAwaitingResponse, setBusy, setMessages } from '@/store/session'
+import { studioPromptText } from '@/store/studio'
 
 import type { ClientSessionState } from '../../../types'
 
@@ -245,7 +246,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         // (Images keep their inline base64 preview — see optimisticAttachmentRef.)
         attachmentRefs = syncedAttachments.map(optimisticAttachmentRef).filter((r): r is string => Boolean(r))
         rewriteOptimistic(sessionId)
-        const text = buildContextText(syncedAttachments)
+        const text = studioPromptText(buildContextText(syncedAttachments))
 
         // On sleep/wake the gateway's in-memory session may have been cleared
         // while the desktop app still holds the old session ID. Detect this,

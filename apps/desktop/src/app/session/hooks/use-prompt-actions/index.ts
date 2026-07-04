@@ -21,6 +21,7 @@ import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { clearPreviewArtifacts } from '@/store/preview-status'
 import { clearAllPrompts } from '@/store/prompts'
 import { $busy, $connection, $messages, setAwaitingResponse, setBusy, setMessages } from '@/store/session'
+import { studioGoalCommand } from '@/store/studio'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 
@@ -458,6 +459,14 @@ export function usePromptActions({
     async (rawText: string, options?: SubmitTextOptions) => {
       const visibleText = rawText.trim()
       const attachments = options?.attachments ?? $composerAttachments.get()
+      const studioGoalText = !attachments.length ? studioGoalCommand(visibleText) : null
+
+      if (studioGoalText) {
+        triggerHaptic('selection')
+        await executeSlashCommand(studioGoalText)
+
+        return true
+      }
 
       if (!attachments.length && SLASH_COMMAND_RE.test(visibleText)) {
         triggerHaptic('selection')
