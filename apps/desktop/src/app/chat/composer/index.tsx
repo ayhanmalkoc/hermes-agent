@@ -708,6 +708,7 @@ export function ChatBar({
         status: conversation.status
       }}
       disabled={disabled}
+      gateway={gateway}
       hasComposerPayload={hasComposerPayload}
       onDictate={dictate}
       onSteer={steerDraft}

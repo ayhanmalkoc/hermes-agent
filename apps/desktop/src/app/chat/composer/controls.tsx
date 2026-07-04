@@ -1,12 +1,18 @@
+import { useStore } from '@nanostores/react'
+
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import { KbdCombo } from '@/components/ui/kbd'
 import { Tip } from '@/components/ui/tooltip'
+import type { HermesGateway } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
-import { AudioLines, iconSize, Layers3, Loader2, Square, SteeringWheel, Volume2, VolumeX } from '@/lib/icons'
+import { AudioLines, iconSize, Layers3, Loader2, Square, SteeringWheel, Volume2, VolumeX, Zap, ZapFilled } from '@/lib/icons'
 import { formatCombo } from '@/lib/keybinds/combo'
 import { cn } from '@/lib/utils'
+import { setGlobalYolo, setSessionYolo } from '@/lib/yolo-session'
+import { $activeSessionId, $freshDraftReady, $gatewayState, $yoloActive, setYoloActive } from '@/store/session'
+import { $studioModeEnabled } from '@/store/studio'
 
 import type { ConversationStatus } from './hooks/use-voice-conversation'
 import { ModelPill } from './model-pill'
@@ -47,6 +53,7 @@ export function ComposerControls({
   compactModelPill = false,
   conversation,
   disabled,
+  gateway,
   hasComposerPayload,
   state,
   voiceStatus,
@@ -62,6 +69,7 @@ export function ComposerControls({
   compactModelPill?: boolean
   conversation: ConversationProps
   disabled: boolean
+  gateway?: HermesGateway | null
   hasComposerPayload: boolean
   state: ChatBarState
   voiceStatus: VoiceStatus
@@ -71,6 +79,12 @@ export function ComposerControls({
 }) {
   const { t } = useI18n()
   const c = t.composer
+  const statusbarCopy = t.shell.statusbar
+  const activeSessionId = useStore($activeSessionId)
+  const freshDraftReady = useStore($freshDraftReady)
+  const gatewayState = useStore($gatewayState)
+  const studioModeEnabled = useStore($studioModeEnabled)
+  const yoloActive = useStore($yoloActive)
   const steerCombo = formatCombo('mod+enter')
   const steerLabel = `${c.steer} (${steerCombo})`
 
@@ -86,10 +100,59 @@ export function ComposerControls({
   }
 
   const showVoicePrimary = !busy && !hasComposerPayload
+  const showStudioYolo = studioModeEnabled && gatewayState === 'open' && (!!activeSessionId || freshDraftReady)
+
+  const toggleYolo = async (shiftKey: boolean) => {
+    const next = !$yoloActive.get()
+
+    setYoloActive(next)
+
+    if (!gateway) {
+      return
+    }
+
+    if (shiftKey) {
+      try {
+        await setGlobalYolo(gateway.request.bind(gateway), next)
+      } catch {
+        setYoloActive(!next)
+      }
+
+      return
+    }
+
+    const sid = $activeSessionId.get()
+
+    if (!sid) {
+      return
+    }
+
+    try {
+      await setSessionYolo(gateway.request.bind(gateway), sid, next)
+    } catch {
+      setYoloActive(!next)
+    }
+  }
 
   return (
     <div className="ml-auto flex shrink-0 items-center gap-(--composer-control-gap)">
       <ModelPill compact={compactModelPill} disabled={disabled} model={state.model} />
+      {showStudioYolo && (
+        <Tip label={yoloActive ? statusbarCopy.yoloOn : statusbarCopy.yoloOff}>
+          <Button
+            aria-label={yoloActive ? statusbarCopy.yoloOn : statusbarCopy.yoloOff}
+            aria-pressed={yoloActive}
+            className={cn(GHOST_ICON_BTN, 'p-0', yoloActive && 'bg-(--chrome-action-hover)')}
+            disabled={disabled}
+            onClick={event => void toggleYolo(event.shiftKey)}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            {yoloActive ? <ZapFilled className="size-3.5 shrink-0" /> : <Zap className="size-3.5 shrink-0 opacity-70" />}
+          </Button>
+        </Tip>
+      )}
       {/* While the agent runs and the user is typing, steer takes over the mic's
           slot rather than crowding the row with an extra button. */}
       {canSteer ? (

@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { getToolsets } from '@/hermes'
 import { isDesktopToolsetVisible } from '@/lib/desktop-toolsets'
 import { cn } from '@/lib/utils'
-import { $yoloActive, setYoloActive } from '@/store/session'
 import {
   $studioAgents,
   $studioModeEnabled,
@@ -57,7 +56,6 @@ export function StudioComposerChipBar() {
   const agents = useStore($studioAgents)
   const teams = useStore($studioTeams)
   const context = useStore($studioRunContext)
-  const yoloActive = useStore($yoloActive)
 
   const toolsetOptions = useQuery({
     enabled,
@@ -94,16 +92,6 @@ export function StudioComposerChipBar() {
       <SelectChip label="Team" onChange={selectStudioTeam} value={context.teamIds[0]} values={teams} />
       <SelectChip label="Agent" onChange={selectStudioAgent} value={context.activeAgentId} values={agents} />
       <SelectChip label="Toolset" onChange={setStudioToolset} value={context.toolset} values={toolsets} />
-      <Button
-        aria-pressed={yoloActive}
-        className={cn('h-6 rounded-full px-2 text-[0.68rem]', yoloActive && 'border-amber-400/50 bg-amber-400/15 text-foreground')}
-        onClick={() => setYoloActive(!yoloActive)}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
-        YOLO {yoloActive ? 'on' : 'off'}
-      </Button>
     </div>
   )
 }
