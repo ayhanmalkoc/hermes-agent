@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import type { HermesGateway } from '@/hermes'
 import { setTerminalTakeover } from '../right-sidebar/store'
 import { $terminals, closeTerminal, createAndOpenTerminal, selectTerminal } from '../right-sidebar/terminal/terminals'
 import {
@@ -69,8 +70,14 @@ function selectTab(tab: RightWorkspaceTab): void {
   selectRightWorkspaceTab(tab.id)
 }
 
-function closeTab(tab: RightWorkspaceTab): void {
+function closeTab(tab: RightWorkspaceTab, gateway?: HermesGateway | null): void {
   if (tab.kind === 'terminal' && tab.terminalId) {
+    const terminal = $terminals.get().find(term => term.id === tab.terminalId)
+
+    if (terminal?.kind === 'agent' && terminal.procId) {
+      void gateway?.request('process.kill', { process_id: terminal.procId }).catch(() => undefined)
+    }
+
     closeTerminal(tab.terminalId)
     closeRightWorkspaceTab(tab.id)
     return
@@ -141,7 +148,7 @@ function RightWorkspaceLauncher() {
   )
 }
 
-function RightWorkspaceHeader() {
+function RightWorkspaceHeader({ gateway }: { gateway?: HermesGateway | null }) {
   const tabs = useStore($rightWorkspaceTabs)
   const active = useStore($activeRightWorkspaceTab)
   const sizeMode = useStore($rightWorkspaceSizeMode)
@@ -170,7 +177,7 @@ function RightWorkspaceHeader() {
               onClick={event => {
                 event.preventDefault()
                 event.stopPropagation()
-                closeTab(tab)
+                closeTab(tab, gateway)
               }}
               role="button"
               tabIndex={-1}
@@ -208,13 +215,13 @@ function RightWorkspaceContent() {
   return <FilesWorkspaceTab tab={active} />
 }
 
-export function RightWorkspace() {
+export function RightWorkspace({ gateway }: { gateway?: HermesGateway | null }) {
   return (
     <aside
       className="relative flex h-full w-full min-w-0 flex-col overflow-hidden bg-(--ui-editor-surface-background) text-(--ui-text-tertiary)"
       style={{ paddingTop: 'var(--right-rail-top-inset, 0px)' }}
     >
-      <RightWorkspaceHeader />
+      <RightWorkspaceHeader gateway={gateway} />
       <RightWorkspaceContent />
     </aside>
   )

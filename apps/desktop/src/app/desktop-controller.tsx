@@ -1103,7 +1103,7 @@ export function DesktopController() {
       side={railSide}
       width={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '34rem'}
     >
-      <RightWorkspace />
+      <RightWorkspace gateway={gatewayRef.current || undefined} />
     </Pane>
   )
 

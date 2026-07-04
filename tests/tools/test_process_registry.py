@@ -176,23 +176,32 @@ def test_close_terminal_tool_requires_process_id():
     assert json.loads(close_terminal_tool(""))["error"]
 
 
-def test_close_terminal_tool_routes_to_registry(monkeypatch):
-    """close_terminal delegates to process_registry.request_close_terminal."""
+def test_close_terminal_tool_kills_process_and_closes_tab(monkeypatch):
+    """close_terminal treats Desktop terminal close as process close + tab close."""
     import tools.close_terminal_tool as ct
 
-    seen = {}
+    seen = []
+
+    def _fake_kill(sid, *, source=""):
+        seen.append(("kill", sid, source))
+
+        return {"status": "ok", "killed": sid}
 
     def _fake_close(sid):
-        seen["sid"] = sid
+        seen.append(("close", sid))
 
         return {"status": "ok", "closed": sid}
 
+    monkeypatch.setattr(ct.process_registry, "kill_process", _fake_kill)
     monkeypatch.setattr(ct.process_registry, "request_close_terminal", _fake_close)
 
     out = ct.close_terminal_tool("proc_abc")
+    parsed = json.loads(out)
 
-    assert json.loads(out)["closed"] == "proc_abc"
-    assert seen["sid"] == "proc_abc"
+    assert parsed["closed"] == "proc_abc"
+    assert parsed["kill"] == {"status": "ok", "killed": "proc_abc"}
+    assert parsed["tab"] == {"status": "ok", "closed": "proc_abc"}
+    assert seen == [("kill", "proc_abc", "close_terminal"), ("close", "proc_abc")]
 
 
 def test_close_terminal_tool_gated_on_desktop(monkeypatch):

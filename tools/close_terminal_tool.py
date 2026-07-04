@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-"""Close a read-only agent terminal tab in the Hermes desktop GUI.
+"""Close a read-only agent terminal tab and stop its process in Hermes Desktop.
 
 Each ``terminal(background=true)`` process is mirrored as a read-only tab in the
-desktop's terminal pane. This tool lets the agent drop a tab it no longer needs
-to show — WITHOUT killing the process (use ``process(action='kill')`` for that).
-The output keeps buffering and the user can reopen the tab from the status stack.
+desktop's terminal pane. In Desktop UX, closing that terminal means closing the
+tab and stopping the background process behind it.
 
 It routes through the process registry's ``on_close`` sink, which the desktop
 gateway wires to emit a ``terminal.close`` event the renderer handles. Like
@@ -22,12 +21,15 @@ from tools.registry import registry, tool_error
 
 
 def close_terminal_tool(process_id: str) -> str:
-    """Ask the desktop GUI to close a background process's read-only tab."""
+    """Kill a background process and ask the desktop GUI to close its tab."""
     pid = (process_id or "").strip()
     if not pid:
-        return tool_error("process_id is required (the background process whose tab to close).")
+        return tool_error("process_id is required (the background process whose terminal to close).")
 
-    return json.dumps(process_registry.request_close_terminal(pid), ensure_ascii=False)
+    kill_result = process_registry.kill_process(pid, source="close_terminal")
+    close_result = process_registry.request_close_terminal(pid)
+
+    return json.dumps({"status": "ok", "closed": pid, "kill": kill_result, "tab": close_result}, ensure_ascii=False)
 
 
 def check_close_terminal_requirements() -> bool:
@@ -38,12 +40,9 @@ def check_close_terminal_requirements() -> bool:
 CLOSE_TERMINAL_SCHEMA = {
     "name": "close_terminal",
     "description": (
-        "Close the read-only terminal tab for one of your background processes in "
-        "the Hermes desktop GUI (the tabs mirroring terminal(background=true) runs). "
-        "This does NOT kill the process — it only drops the tab/view; the output "
-        "keeps buffering and the user can reopen it from the status stack. Use it "
-        "to tidy up when a background process's live terminal is no longer worth "
-        "showing. To actually stop the process, use process(action='kill') instead."
+        "Close one of your background terminals in the Hermes desktop GUI. This "
+        "kills the background process started by terminal(background=true) and "
+        "closes its mirrored terminal tab."
     ),
     "parameters": {
         "type": "object",
@@ -52,7 +51,7 @@ CLOSE_TERMINAL_SCHEMA = {
                 "type": "string",
                 "description": (
                     "The background process's session id (from terminal(background=true) "
-                    "output or process(action='list')) whose tab should be closed."
+                    "output or process(action='list')) whose terminal should be closed."
                 ),
             },
         },
