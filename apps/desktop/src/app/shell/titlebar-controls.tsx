@@ -194,7 +194,7 @@ export function TitlebarControls({ leftTools = [], studioChrome = false, tools =
         </div>
       )}
 
-      {!studioChrome && (
+      {(
         <div
           aria-label={t.shell.appControls}
           className="fixed right-(--titlebar-tools-right) top-(--titlebar-controls-top) z-70 flex flex-row items-center justify-end gap-x-1 pointer-events-auto select-none [-webkit-app-region:no-drag]"
