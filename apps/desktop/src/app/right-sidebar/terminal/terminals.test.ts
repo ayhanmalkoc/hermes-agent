@@ -174,4 +174,15 @@ describe('terminal store persistence', () => {
     expect(closeAgentTerminalByProc(secondId)).toBe(true)
     expect($rightWorkspaceTabs.get().some(tab => tab.terminalId === secondId)).toBe(false)
   })
+
+  it('closes finished agent terminal tabs by process id', async () => {
+    const { closeFinishedAgentTerminals, ensureAgentTerminal } = await loadTerminalStore()
+    const { $rightWorkspaceTabs } = await import('@/store/right-workspace')
+
+    const id = ensureAgentTerminal('proc-done', 'agent task')!
+
+    closeFinishedAgentTerminals(['proc-done'])
+
+    expect($rightWorkspaceTabs.get().some(tab => tab.terminalId === id)).toBe(false)
+  })
 })

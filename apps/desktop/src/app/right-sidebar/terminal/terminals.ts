@@ -384,6 +384,20 @@ export function closeAgentTerminalByProc(procId: string): boolean {
   return true
 }
 
+export function closeFinishedAgentTerminals(processIds: readonly string[]): void {
+  const ids = new Set(processIds.map(id => id.trim()).filter(Boolean))
+
+  if (!ids.size) {
+    return
+  }
+
+  for (const term of $terminals.get()) {
+    if (term.kind === 'agent' && term.procId && ids.has(term.procId)) {
+      closeTerminal(term.id)
+    }
+  }
+}
+
 export function closeActiveTerminal(): void {
   const id = $activeTerminalId.get()
 

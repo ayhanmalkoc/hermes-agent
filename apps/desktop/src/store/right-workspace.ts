@@ -127,6 +127,22 @@ function applySnapshot(next: RightWorkspaceSnapshot): void {
   applyingSnapshot = false
 }
 
+export function pruneRightWorkspaceTerminalTabs(validTerminalIds: readonly string[]): void {
+  const valid = new Set(validTerminalIds)
+  const current = $rightWorkspaceTabs.get()
+  const next = current.filter(tab => tab.kind !== 'terminal' || (tab.terminalId && valid.has(tab.terminalId)))
+
+  if (next.length === current.length) {
+    return
+  }
+
+  $rightWorkspaceTabs.set(next)
+
+  if ($activeRightWorkspaceTabId.get() && !next.some(tab => tab.id === $activeRightWorkspaceTabId.get())) {
+    $activeRightWorkspaceTabId.set(next.at(-1)?.id ?? null)
+  }
+}
+
 function persistActiveSnapshot(): void {
   if (!applyingSnapshot) {
     persistSnapshot()

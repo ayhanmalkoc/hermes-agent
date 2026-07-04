@@ -4,12 +4,13 @@ import { useEffect } from 'react'
 import type { HermesConnection } from '@/global'
 import type { HermesGateway } from '@/hermes'
 import { $backgroundStatusBySession } from '@/store/composer-status'
+import { pruneRightWorkspaceTerminalTabs } from '@/store/right-workspace'
 import { $activeSessionId } from '@/store/session'
 
 import { seedAgentTerminalCommand, syncAgentTerminalSnapshot } from './agent-terminal-stream'
 import { setActiveTerminalId } from './buffer'
 import { AgentTerminalInstance, TerminalInstance } from './instance'
-import { $activeTerminalId, $terminals, ensureAgentTerminal } from './terminals'
+import { $activeTerminalId, $terminals, closeFinishedAgentTerminals, ensureAgentTerminal } from './terminals'
 
 interface TerminalWorkspaceProps {
   connection?: HermesConnection | null
@@ -42,13 +43,24 @@ export function TerminalWorkspace({ connection, gateway, onAddSelectionToChat }:
   // seeds/falls back so the tab never stays blank if the stream races startup.
   useEffect(() => {
     const list = activeSessionId ? (background[activeSessionId] ?? []) : []
+    const finishedIds = list.filter(item => item.state !== 'running').map(item => item.id)
+
+    closeFinishedAgentTerminals(finishedIds)
 
     for (const item of list) {
+      if (item.state !== 'running') {
+        continue
+      }
+
       ensureAgentTerminal(item.id, item.title)
       seedAgentTerminalCommand(item.id, item.title)
       syncAgentTerminalSnapshot(item.id, item.output ?? '')
     }
   }, [activeSessionId, background])
+
+  useEffect(() => {
+    pruneRightWorkspaceTerminalTabs(terminals.map(term => term.id))
+  }, [terminals])
 
   return (
     <>

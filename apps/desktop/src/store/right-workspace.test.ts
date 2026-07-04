@@ -6,6 +6,7 @@ import {
   $rightWorkspaceTabs,
   openReviewWorkspace,
   openTerminalWorkspaceForTerminal,
+  pruneRightWorkspaceTerminalTabs,
   setRightWorkspaceScope,
   toggleRightWorkspaceSize
 } from './right-workspace'
@@ -48,5 +49,15 @@ describe('right workspace session scope', () => {
       { id: 'terminal:draft-term', kind: 'terminal', terminalId: 'draft-term' }
     ])
     expect(window.localStorage.getItem('hermes.desktop.rightWorkspace.v1.draft%3Alocal%3A%2Frepo')).toBeNull()
+  })
+
+  it('prunes stale terminal tabs with no matching terminal entry', () => {
+    openTerminalWorkspaceForTerminal('live-term')
+    openTerminalWorkspaceForTerminal('stale-term')
+
+    pruneRightWorkspaceTerminalTabs(['live-term'])
+
+    expect($rightWorkspaceTabs.get()).toMatchObject([{ id: 'terminal:live-term', terminalId: 'live-term' }])
+    expect($activeRightWorkspaceTabId.get()).toBe('terminal:live-term')
   })
 })

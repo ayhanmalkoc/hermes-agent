@@ -72,6 +72,7 @@ function selectTab(tab: RightWorkspaceTab): void {
 function closeTab(tab: RightWorkspaceTab): void {
   if (tab.kind === 'terminal' && tab.terminalId) {
     closeTerminal(tab.terminalId)
+    closeRightWorkspaceTab(tab.id)
     return
   }
 
