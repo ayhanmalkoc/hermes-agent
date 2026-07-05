@@ -459,11 +459,13 @@ export function usePromptActions({
     async (rawText: string, options?: SubmitTextOptions) => {
       const visibleText = rawText.trim()
       const attachments = options?.attachments ?? $composerAttachments.get()
-      const studioGoalText = !attachments.length ? studioGoalCommand(visibleText) : null
+      const studioSessionKey = selectedStoredSessionIdRef.current || activeSessionIdRef.current
+      const studioGoalText = !attachments.length ? studioGoalCommand(visibleText, studioSessionKey) : null
 
       if (studioGoalText) {
         triggerHaptic('selection')
         const sessionId = activeSessionIdRef.current || (await createBackendSessionForSend(visibleText))
+        const studioGoalArg = studioGoalText.replace(/^\/goal\s*/, '')
 
         if (!sessionId) {
           notify({ kind: 'error', title: copy.sessionUnavailable, message: copy.createSessionFailed })
@@ -472,7 +474,7 @@ export function usePromptActions({
         }
 
         const dispatch = parseCommandDispatch(
-          await requestGateway<unknown>('command.dispatch', { session_id: sessionId, name: 'goal', arg: visibleText })
+          await requestGateway<unknown>('command.dispatch', { session_id: sessionId, name: 'goal', arg: studioGoalArg })
         )
 
         if (!dispatch) {

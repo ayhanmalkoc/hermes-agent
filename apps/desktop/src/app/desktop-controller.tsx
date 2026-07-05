@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 import { useQueryClient } from '@tanstack/react-query'
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom'
 
 import { BootFailureOverlay } from '@/components/boot-failure-overlay'
@@ -128,8 +128,8 @@ import type { TitlebarTool } from './shell/titlebar-controls'
 import { useGroupRegistry } from './shell/use-group-registry'
 import { UpdatesOverlay } from './updates-overlay'
 
-const AgentsView = lazy(async () => ({ default: (await import('./agents')).AgentsView }))
-const AgentsPage = lazy(async () => ({ default: (await import('./agents-page')).AgentsPage }))
+const AgentsProfileView = lazy(async () => ({ default: (await import('./agents-profile')).AgentsProfileView }))
+const SubagentsView = lazy(async () => ({ default: (await import('./agents')).SubagentsView }))
 const ArtifactsView = lazy(async () => ({ default: (await import('./artifacts')).ArtifactsView }))
 const CommandCenterView = lazy(async () => ({ default: (await import('./command-center')).CommandCenterView }))
 const CronView = lazy(async () => ({ default: (await import('./cron')).CronView }))
@@ -219,8 +219,12 @@ export function DesktopController() {
     profilesOpen,
     settingsOpen,
     starmapOpen,
+    teamsOpen,
     toggleCommandCenter
   } = useOverlayRouting()
+  const [subagentsOpen, setSubagentsOpen] = useState(false)
+  const openSubagents = useCallback(() => setSubagentsOpen(true), [])
+  const closeSubagents = useCallback(() => setSubagentsOpen(false), [])
 
   const terminalSidebarOpen = chatOpen && terminalTakeover
   const rightWorkspaceOpen = (chatOpen || currentView === 'artifacts') && rightWorkspacePaneOpen
@@ -908,14 +912,14 @@ export function DesktopController() {
   })
 
   const { leftStatusbarItems, statusbarItems } = useStatusbarItems({
-    agentsOpen,
+    agentsOpen: subagentsOpen,
     chatOpen,
     commandCenterOpen,
     extraLeftItems: statusbarItemGroups.flat.left,
     extraRightItems: statusbarItemGroups.flat.right,
     gatewayState,
     inferenceStatus,
-    openAgents,
+    openAgents: openSubagents,
     freshDraftReady,
     openCommandCenterSection,
     requestGateway,
@@ -1023,7 +1027,13 @@ export function DesktopController() {
 
       {agentsOpen && (
         <Suspense fallback={null}>
-          <AgentsView onClose={closeOverlayToPreviousRoute} />
+          <AgentsProfileView onClose={closeOverlayToPreviousRoute} />
+        </Suspense>
+      )}
+
+      {subagentsOpen && (
+        <Suspense fallback={null}>
+          <SubagentsView onClose={closeSubagents} />
         </Suspense>
       )}
 
@@ -1039,6 +1049,12 @@ export function DesktopController() {
       {profilesOpen && (
         <Suspense fallback={null}>
           <ProfilesView onClose={closeOverlayToPreviousRoute} />
+        </Suspense>
+      )}
+
+      {teamsOpen && (
+        <Suspense fallback={null}>
+          <TeamsView onClose={closeOverlayToPreviousRoute} />
         </Suspense>
       )}
 
@@ -1172,22 +1188,8 @@ export function DesktopController() {
           <Route element={null} path="profiles" />
           <Route element={null} path="settings" />
           <Route element={null} path="command-center" />
-          <Route
-            element={
-              <Suspense fallback={null}>
-                <AgentsPage />
-              </Suspense>
-            }
-            path="agents"
-          />
-          <Route
-            element={
-              <Suspense fallback={null}>
-                <TeamsView />
-              </Suspense>
-            }
-            path="teams"
-          />
+          <Route element={null} path="agents" />
+          <Route element={null} path="teams" />
           <Route element={<Navigate replace to={NEW_CHAT_ROUTE} />} path="new" />
           <Route element={<LegacySessionRedirect />} path="sessions/:sessionId" />
           <Route element={<Navigate replace to={NEW_CHAT_ROUTE} />} path="*" />

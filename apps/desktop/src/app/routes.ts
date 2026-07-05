@@ -69,7 +69,8 @@ export const OVERLAY_VIEWS: ReadonlySet<AppView> = new Set([
   'cron',
   'profiles',
   'settings',
-  'starmap'
+  'starmap',
+  'teams'
 ])
 
 export function isOverlayView(view: AppView): boolean {

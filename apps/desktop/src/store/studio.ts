@@ -2,6 +2,8 @@ import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
 
+import { studioTeamPromptContext } from './studio-teams'
+
 const STORAGE_KEY = 'hermes.desktop.studio.state'
 
 export interface StudioRunContext {
@@ -69,14 +71,16 @@ export function toggleStudioGoal(): void {
   updateStudioRunContext({ goalEnabled: !$studioState.get().runContext.goalEnabled })
 }
 
-export function studioPromptText(text: string): string {
-  return text
+export function studioPromptText(text: string, sessionId?: null | string): string {
+  const teamContext = studioTeamPromptContext(sessionId)
+
+  return teamContext ? `${teamContext}\n\nUser request:\n${text}` : text
 }
 
-export function studioGoalCommand(text: string): string | null {
+export function studioGoalCommand(text: string, sessionId?: null | string): string | null {
   if (!$studioState.get().runContext.goalEnabled) {
     return null
   }
 
-  return `/goal ${text}`
+  return `/goal ${studioPromptText(text, sessionId)}`
 }

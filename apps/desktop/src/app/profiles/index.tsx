@@ -57,9 +57,10 @@ function isValidProfileName(name: string): boolean {
 
 interface ProfilesViewProps {
   onClose: () => void
+  title?: string
 }
 
-export function ProfilesView({ onClose }: ProfilesViewProps) {
+export function ProfilesView({ onClose, title }: ProfilesViewProps) {
   const { t } = useI18n()
   const p = t.profiles
   const [profiles, setProfiles] = useState<null | ProfileInfo[]>(null)
@@ -185,7 +186,7 @@ export function ProfilesView({ onClose }: ProfilesViewProps) {
         />
       ) : (
         <>
-          <PanelHeader subtitle={p.count(profiles.length)} title={p.title} />
+          <PanelHeader subtitle={p.count(profiles.length)} title={title ?? p.title} />
           <PanelBody>
             <PanelList
               onSearchChange={setQuery}

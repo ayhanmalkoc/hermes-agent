@@ -21,6 +21,7 @@ export function useOverlayRouting() {
   const settingsOpen = currentView === 'settings'
   const commandCenterOpen = currentView === 'command-center'
   const agentsOpen = currentView === 'agents'
+  const teamsOpen = currentView === 'teams'
   const starmapOpen = currentView === 'starmap'
   const cronOpen = currentView === 'cron'
   const profilesOpen = currentView === 'profiles'
@@ -77,6 +78,7 @@ export function useOverlayRouting() {
     profilesOpen,
     settingsOpen,
     starmapOpen,
+    teamsOpen,
     toggleCommandCenter
   }
 }

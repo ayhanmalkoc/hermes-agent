@@ -9,6 +9,7 @@ import {
 } from 'react'
 
 import { StudioGoalButton } from '@/app/studio/composer-goal-button'
+import { StudioTeamButton } from '@/app/studio/composer-team-button'
 import { composerFill, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
@@ -688,6 +689,7 @@ export function ChatBar({
         onPickImages={onPickImages}
         state={state}
       />
+      <StudioTeamButton sessionId={sessionId} />
       <StudioGoalButton />
     </>
   )

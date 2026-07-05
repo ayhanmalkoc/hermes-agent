@@ -7,6 +7,7 @@ import { textPart } from '@/lib/chat-messages'
 import { $composerAttachments, $composerDraft, type ComposerAttachment, setComposerDraft } from '@/store/composer'
 import { $busy, $connection, $messages, $sessions, setSessions } from '@/store/session'
 import { updateStudioRunContext } from '@/store/studio'
+import { $studioTeamAssignments, $studioTeams, createStudioTeam, setStudioTeamForSession } from '@/store/studio-teams'
 import type { SessionInfo } from '@/types/hermes'
 
 import { uploadComposerAttachment, usePromptActions } from '.'
@@ -217,6 +218,8 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
   afterEach(() => {
     cleanup()
     $busy.set(false)
+    $studioTeams.set([])
+    $studioTeamAssignments.set({})
     updateStudioRunContext({ goalEnabled: false })
     vi.restoreAllMocks()
   })
@@ -317,6 +320,48 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
       session_id: RUNTIME_SESSION_ID,
       text: 'improve onboarding'
     })
+  })
+
+  it('includes selected team context in studio goal kickoff', async () => {
+    updateStudioRunContext({ goalEnabled: true })
+    const team = createStudioTeam({
+      description: 'QA coverage',
+      instructions: 'Delegate UI review to QA profile.',
+      name: 'QA Team',
+      profileIds: ['qa']
+    })
+    setStudioTeamForSession(RUNTIME_SESSION_ID, team.id)
+
+    const calls: { method: string; params?: Record<string, unknown> }[] = []
+    const requestGateway = vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      calls.push({ method, params })
+
+      if (method === 'command.dispatch') {
+        return {
+          type: 'send',
+          message: String(params?.arg ?? '')
+        } as never
+      }
+
+      return {} as never
+    })
+
+    let handle: HarnessHandle | null = null
+    render(
+      <Harness
+        onReady={h => (handle = h)}
+        refreshSessions={async () => undefined}
+        requestGateway={requestGateway}
+      />
+    )
+
+    expect(await handle!.submitText('check the release')).toBe(true)
+
+    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['command.dispatch', 'prompt.submit']))
+    expect(calls[0]?.params?.arg).toContain('Studio team context:')
+    expect(calls[0]?.params?.arg).toContain('Team: QA Team')
+    expect(calls[0]?.params?.arg).toContain('check the release')
+    expect(calls[1]?.params?.text).toContain('Studio team context:')
   })
 
   it('dispatches a slash command with a multiline arg instead of "empty slash command" (#41323, #55510)', async () => {

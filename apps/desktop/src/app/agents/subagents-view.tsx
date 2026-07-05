@@ -72,11 +72,11 @@ function streamGlyph(entry: SubagentStreamEntry): ReactNode {
   return <span aria-hidden className="mt-0.5 size-1 shrink-0 rounded-full bg-muted-foreground/55" />
 }
 
-interface AgentsViewProps {
+interface SubagentsViewProps {
   onClose: () => void
 }
 
-export function AgentsView({ onClose }: AgentsViewProps) {
+export function SubagentsView({ onClose }: SubagentsViewProps) {
   const { t } = useI18n()
   const subagentsBySession = useStore($subagentsBySession)
 

@@ -246,7 +246,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         // (Images keep their inline base64 preview — see optimisticAttachmentRef.)
         attachmentRefs = syncedAttachments.map(optimisticAttachmentRef).filter((r): r is string => Boolean(r))
         rewriteOptimistic(sessionId)
-        const text = studioPromptText(buildContextText(syncedAttachments))
+        const text = studioPromptText(buildContextText(syncedAttachments), selectedStoredSessionIdRef.current || sessionId)
 
         // On sleep/wake the gateway's in-memory session may have been cleared
         // while the desktop app still holds the old session ID. Detect this,
