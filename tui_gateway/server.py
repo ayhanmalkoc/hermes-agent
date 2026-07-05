@@ -5090,11 +5090,19 @@ def _(rid, params: dict) -> dict:
         with db._lock:
             rows = db._conn.execute(
                 """
-                SELECT id, title, started_at, updated_at, model, model_config
-                FROM sessions
-                WHERE json_extract(COALESCE(model_config, '{}'), '$._studio_agent_run') = 1
-                  AND json_extract(COALESCE(model_config, '{}'), '$._studio_parent_session_id') = ?
-                ORDER BY COALESCE(updated_at, started_at, 0) DESC
+                SELECT
+                    s.id,
+                    s.title,
+                    s.started_at,
+                    COALESCE(MAX(m.timestamp), s.started_at) AS last_active,
+                    s.model,
+                    s.model_config
+                FROM sessions s
+                LEFT JOIN messages m ON m.session_id = s.id
+                WHERE json_extract(COALESCE(s.model_config, '{}'), '$._studio_agent_run') = 1
+                  AND json_extract(COALESCE(s.model_config, '{}'), '$._studio_parent_session_id') = ?
+                GROUP BY s.id
+                ORDER BY last_active DESC, s.started_at DESC
                 LIMIT 100
                 """,
                 (parent_session_id,),
@@ -5131,7 +5139,7 @@ def _(rid, params: dict) -> dict:
                     "id": row["id"],
                     "title": row["title"] or "",
                     "started_at": row["started_at"] or 0,
-                    "updated_at": row["updated_at"] or row["started_at"] or 0,
+                    "updated_at": row["last_active"] or row["started_at"] or 0,
                     "model": row["model"] or model_config.get("model") or "",
                     "profile_id": model_config.get("_studio_profile_id") or "",
                     "profile_name": model_config.get("_studio_profile_name") or model_config.get("_studio_profile_id") or "",
