@@ -4,7 +4,7 @@ import { readKey, writeKey } from '@/lib/storage'
 
 const TEAMS_STORAGE_KEY = 'hermes.desktop.studio.teams'
 const ASSIGNMENTS_STORAGE_KEY = 'hermes.desktop.studio.teamAssignments'
-const DRAFT_SESSION_KEY = 'draft'
+export const DRAFT_STUDIO_SESSION_KEY = 'draft'
 
 export interface StudioTeam {
   description: string
@@ -57,7 +57,7 @@ function newId(): string {
 }
 
 function sessionKey(value: null | string | undefined): string {
-  return value?.trim() || DRAFT_SESSION_KEY
+  return value?.trim() || DRAFT_STUDIO_SESSION_KEY
 }
 
 export const $studioTeams = atom<StudioTeam[]>(normalizeTeams(parseJson(readKey(TEAMS_STORAGE_KEY), [])))
@@ -107,6 +107,19 @@ export function getStudioTeamForSession(sessionId: null | string | undefined): S
   const teamId = $studioTeamAssignments.get()[sessionKey(sessionId)]
 
   return teamId ? ($studioTeamsById.get().get(teamId) ?? null) : null
+}
+
+export function bindDraftStudioTeamToSession(sessionId: null | string | undefined): void {
+  const key = sessionKey(sessionId)
+
+  if (!sessionId?.trim() || key === DRAFT_STUDIO_SESSION_KEY) return
+
+  const assignments = $studioTeamAssignments.get()
+  const draftTeamId = assignments[DRAFT_STUDIO_SESSION_KEY]
+
+  if (!draftTeamId || assignments[key]) return
+
+  saveAssignments({ ...assignments, [key]: draftTeamId })
 }
 
 export function studioTeamPromptContext(sessionId: null | string | undefined): string {

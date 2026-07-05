@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   $studioTeamAssignments,
   $studioTeams,
+  bindDraftStudioTeamToSession,
   createStudioTeam,
   deleteStudioTeam,
   getStudioTeamForSession,
@@ -55,5 +56,21 @@ describe('studio teams store', () => {
     expect(studioTeamPromptContext(null)).toContain('The active Hermes profile is the lead/manager')
     expect(studioTeamPromptContext(null)).toContain('delegate_task')
     expect(studioTeamPromptContext(null)).toContain('profile_id')
+  })
+
+  it('binds a draft team selection to the first real session', () => {
+    const team = createStudioTeam({
+      description: 'Product delivery',
+      instructions: 'Delegate by profile id.',
+      name: 'Delivery Team',
+      profileIds: ['planner', 'coder']
+    })
+
+    setStudioTeamForSession(null, team.id)
+    bindDraftStudioTeamToSession('session-new')
+
+    expect(getStudioTeamForSession('session-new')?.id).toBe(team.id)
+    expect(studioTeamPromptContext('session-new')).toContain('Team: Delivery Team')
+    expect(studioTeamPromptContext('session-new')).toContain('Members: planner, coder')
   })
 })

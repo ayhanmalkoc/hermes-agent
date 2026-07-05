@@ -15,6 +15,7 @@ import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { requestDesktopOnboarding } from '@/store/onboarding'
 import { setAwaitingResponse, setBusy, setMessages } from '@/store/session'
 import { studioPromptText } from '@/store/studio'
+import { bindDraftStudioTeamToSession } from '@/store/studio-teams'
 
 import type { ClientSessionState } from '../../../types'
 
@@ -246,6 +247,7 @@ export function useSubmitPrompt(deps: SubmitPromptDeps) {
         // (Images keep their inline base64 preview — see optimisticAttachmentRef.)
         attachmentRefs = syncedAttachments.map(optimisticAttachmentRef).filter((r): r is string => Boolean(r))
         rewriteOptimistic(sessionId)
+        bindDraftStudioTeamToSession(sessionId)
         const text = studioPromptText(buildContextText(syncedAttachments), selectedStoredSessionIdRef.current || sessionId)
 
         // On sleep/wake the gateway's in-memory session may have been cleared

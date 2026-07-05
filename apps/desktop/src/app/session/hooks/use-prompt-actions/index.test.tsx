@@ -364,6 +364,42 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
     expect(calls[1]?.params?.text).toContain('Studio team context:')
   })
 
+  it('carries a draft team selection into the first prompt submit', async () => {
+    const team = createStudioTeam({
+      description: 'Cross-functional delivery',
+      instructions: 'Delegate to the listed profiles by profile_id.',
+      name: 'Delivery Team',
+      profileIds: ['planner', 'coder']
+    })
+    setStudioTeamForSession(null, team.id)
+
+    const calls: { method: string; params?: Record<string, unknown> }[] = []
+    const requestGateway = vi.fn(async (method: string, params?: Record<string, unknown>) => {
+      calls.push({ method, params })
+
+      return {} as never
+    })
+
+    let handle: HarnessHandle | null = null
+    render(
+      <Harness
+        onReady={h => (handle = h)}
+        refreshSessions={async () => undefined}
+        requestGateway={requestGateway}
+        storedSessionId={null}
+      />
+    )
+
+    expect(await handle!.submitText('plan the launch')).toBe(true)
+
+    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['prompt.submit']))
+    expect(calls[0]?.params?.text).toContain('Studio team context:')
+    expect(calls[0]?.params?.text).toContain('Team: Delivery Team')
+    expect(calls[0]?.params?.text).toContain('Members: planner, coder')
+    expect(calls[0]?.params?.text).toContain('plan the launch')
+    expect($studioTeamAssignments.get()[RUNTIME_SESSION_ID]).toBe(team.id)
+  })
+
   it('dispatches a slash command with a multiline arg instead of "empty slash command" (#41323, #55510)', async () => {
     const calls: { method: string; params?: Record<string, unknown> }[] = []
     const states: Record<string, unknown>[] = []
