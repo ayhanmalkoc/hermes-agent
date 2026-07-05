@@ -2,17 +2,19 @@ import { useStore } from '@nanostores/react'
 
 import { Codicon } from '@/components/ui/codicon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import type { HermesGateway } from '@/hermes'
 import { cn } from '@/lib/utils'
 import { $studioTeamAssignments, $studioTeams, setStudioTeamForSession } from '@/store/studio-teams'
 
 interface StudioTeamButtonProps {
   className?: string
+  gateway?: HermesGateway | null
   sessionId?: null | string
 }
 
 const NO_TEAM = '__none__'
 
-export function StudioTeamButton({ className, sessionId }: StudioTeamButtonProps) {
+export function StudioTeamButton({ className, gateway, sessionId }: StudioTeamButtonProps) {
   const teams = useStore($studioTeams)
   const assignments = useStore($studioTeamAssignments)
   const key = sessionId?.trim() || 'draft'
@@ -24,7 +26,9 @@ export function StudioTeamButton({ className, sessionId }: StudioTeamButtonProps
 
   return (
     <Select
-      onValueChange={next => setStudioTeamForSession(sessionId, next === NO_TEAM ? null : next)}
+      onValueChange={next => {
+        void setStudioTeamForSession(sessionId, next === NO_TEAM ? null : next, gateway?.request.bind(gateway))
+      }}
       value={value}
     >
       <SelectTrigger

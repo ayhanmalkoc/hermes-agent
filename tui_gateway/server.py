@@ -219,6 +219,8 @@ _LONG_HANDLERS = frozenset(
         "session.list",
         "session.resume",
         "studio.agent_runs",
+        "studio.team.get",
+        "studio.team.set",
         "shell.exec",
         "skills.manage",
         "slash.exec",
@@ -1591,6 +1593,8 @@ def _ensure_session_db_row(session: dict) -> None:
         model_config["reasoning_config"] = reasoning
     if tier := session.get("create_service_tier_override"):
         model_config["service_tier"] = tier
+    if studio_team := _normalize_studio_team(session.get("studio_team")):
+        model_config = _merge_studio_team(model_config, studio_team)
     # Branch lineage: stamp the same ``_branched_from`` marker the TUI /branch
     # uses so list_sessions_rich keeps the branch listed and the desktop sidebar
     # can nest it under its parent.
@@ -2089,6 +2093,77 @@ def _stored_session_runtime_overrides(row: dict | None) -> dict:
         overrides["service_tier_override"] = service_tier
 
     return overrides
+
+
+def _parse_model_config(raw_config) -> dict:
+    if isinstance(raw_config, dict):
+        return dict(raw_config)
+    if isinstance(raw_config, str) and raw_config.strip():
+        try:
+            parsed = json.loads(raw_config)
+            if isinstance(parsed, dict):
+                return parsed
+        except Exception:
+            logger.debug("failed to parse session model_config", exc_info=True)
+    return {}
+
+
+def _normalize_studio_team(value) -> dict | None:
+    if not isinstance(value, dict):
+        return None
+    team_id = str(value.get("id") or "").strip()
+    name = str(value.get("name") or "").strip()
+    if not team_id or not name:
+        return None
+    raw_profiles = value.get("profileIds") or value.get("profile_ids") or []
+    profile_ids = []
+    if isinstance(raw_profiles, list):
+        seen = set()
+        for item in raw_profiles:
+            profile_id = str(item or "").strip()
+            if profile_id and profile_id not in seen:
+                seen.add(profile_id)
+                profile_ids.append(profile_id)
+    return {
+        "id": team_id,
+        "name": name,
+        "description": str(value.get("description") or ""),
+        "profileIds": profile_ids,
+        "instructions": str(value.get("instructions") or ""),
+    }
+
+
+def _studio_team_from_config(model_config: dict | None) -> dict | None:
+    studio = (model_config or {}).get("studio")
+    if not isinstance(studio, dict):
+        return None
+    return _normalize_studio_team(studio.get("team"))
+
+
+def _merge_studio_team(model_config: dict, team: dict | None) -> dict:
+    next_config = dict(model_config or {})
+    studio = next_config.get("studio")
+    studio = dict(studio) if isinstance(studio, dict) else {}
+    if team:
+        studio["team"] = team
+    else:
+        studio.pop("team", None)
+    if studio:
+        next_config["studio"] = studio
+    else:
+        next_config.pop("studio", None)
+    return next_config
+
+
+def _persist_studio_team(session_id: str, team: dict | None) -> dict:
+    db = _get_db()
+    if db is None:
+        raise RuntimeError("session db unavailable")
+    row = db.get_session(session_id)
+    model_config = _parse_model_config((row or {}).get("model_config"))
+    model_config = _merge_studio_team(model_config, team)
+    db.update_session_meta(session_id, json.dumps(model_config), None)
+    return model_config
 
 
 def _runtime_model_config(agent, existing: dict | None = None) -> dict:
@@ -5152,6 +5227,60 @@ def _(rid, params: dict) -> dict:
         return _ok(rid, {"runs": runs})
     except Exception as e:
         logger.exception("studio.agent_runs failed")
+        return _err(rid, 5006, str(e))
+
+
+@method("studio.team.get")
+def _(rid, params: dict) -> dict:
+    session_id = str(params.get("session_id") or "").strip()
+    if not session_id:
+        return _err(rid, 4006, "session_id required")
+
+    with _sessions_lock:
+        live_team = _normalize_studio_team((_sessions.get(session_id) or {}).get("studio_team"))
+    if live_team:
+        return _ok(rid, {"team": live_team})
+
+    db = _get_db()
+    if db is None:
+        return _db_unavailable_error(rid, code=5006)
+
+    try:
+        row = db.get_session(session_id) or {}
+        team = _studio_team_from_config(_parse_model_config(row.get("model_config")))
+        return _ok(rid, {"team": team})
+    except Exception as e:
+        logger.exception("studio.team.get failed")
+        return _err(rid, 5006, str(e))
+
+
+@method("studio.team.set")
+def _(rid, params: dict) -> dict:
+    session_id = str(params.get("session_id") or "").strip()
+    if not session_id:
+        return _err(rid, 4006, "session_id required")
+
+    team = _normalize_studio_team(params.get("team"))
+
+    with _sessions_lock:
+        session = _sessions.get(session_id)
+        if session is not None:
+            if team:
+                session["studio_team"] = team
+            else:
+                session.pop("studio_team", None)
+
+    db = _get_db()
+    if db is None:
+        return _ok(rid, {"team": team})
+
+    try:
+        row = db.get_session(session_id)
+        if row:
+            _persist_studio_team(session_id, team)
+        return _ok(rid, {"team": team})
+    except Exception as e:
+        logger.exception("studio.team.set failed")
         return _err(rid, 5006, str(e))
 
 

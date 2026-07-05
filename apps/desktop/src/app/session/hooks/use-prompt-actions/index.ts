@@ -21,7 +21,8 @@ import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { clearPreviewArtifacts } from '@/store/preview-status'
 import { clearAllPrompts } from '@/store/prompts'
 import { $busy, $connection, $messages, setAwaitingResponse, setBusy, setMessages } from '@/store/session'
-import { studioGoalCommand } from '@/store/studio'
+import { $studioRunContext, studioGoalCommandForSession } from '@/store/studio'
+import { bindDraftStudioTeamToSession } from '@/store/studio-teams'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
 
@@ -459,19 +460,22 @@ export function usePromptActions({
     async (rawText: string, options?: SubmitTextOptions) => {
       const visibleText = rawText.trim()
       const attachments = options?.attachments ?? $composerAttachments.get()
-      const studioSessionKey = selectedStoredSessionIdRef.current || activeSessionIdRef.current
-      const studioGoalText = !attachments.length ? studioGoalCommand(visibleText, studioSessionKey) : null
+      const studioGoalEnabled = $studioRunContext.get().goalEnabled
 
-      if (studioGoalText) {
+      if (!attachments.length && studioGoalEnabled) {
         triggerHaptic('selection')
         const sessionId = activeSessionIdRef.current || (await createBackendSessionForSend(visibleText))
-        const studioGoalArg = studioGoalText.replace(/^\/goal\s*/, '')
 
         if (!sessionId) {
           notify({ kind: 'error', title: copy.sessionUnavailable, message: copy.createSessionFailed })
 
           return false
         }
+
+        await bindDraftStudioTeamToSession(sessionId, requestGateway)
+        const studioSessionKey = selectedStoredSessionIdRef.current || sessionId
+        const studioGoalText = await studioGoalCommandForSession(visibleText, studioSessionKey, requestGateway)
+        const studioGoalArg = (studioGoalText ?? visibleText).replace(/^\/goal\s*/, '')
 
         const dispatch = parseCommandDispatch(
           await requestGateway<unknown>('command.dispatch', { session_id: sessionId, name: 'goal', arg: studioGoalArg })

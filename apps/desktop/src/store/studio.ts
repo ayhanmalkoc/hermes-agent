@@ -2,7 +2,7 @@ import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
 
-import { studioTeamPromptContext } from './studio-teams'
+import { studioTeamPromptContext, studioTeamPromptContextForSession, type StudioTeamGateway } from './studio-teams'
 
 const STORAGE_KEY = 'hermes.desktop.studio.state'
 
@@ -77,10 +77,38 @@ export function studioPromptText(text: string, sessionId?: null | string): strin
   return teamContext ? `${teamContext}\n\nUser request:\n${text}` : text
 }
 
+export async function studioPromptTextForSession(
+  text: string,
+  sessionId?: null | string,
+  requestGateway?: StudioTeamGateway
+): Promise<string> {
+  if (!$studioState.get().modeEnabled) {
+    return text
+  }
+
+  const teamContext = await studioTeamPromptContextForSession(sessionId, requestGateway)
+
+  return teamContext ? `${teamContext}\n\nUser request:\n${text}` : text
+}
+
 export function studioGoalCommand(text: string, sessionId?: null | string): string | null {
   if (!$studioState.get().runContext.goalEnabled) {
     return null
   }
 
   return `/goal ${studioPromptText(text, sessionId)}`
+}
+
+export async function studioGoalCommandForSession(
+  text: string,
+  sessionId?: null | string,
+  requestGateway?: StudioTeamGateway
+): Promise<string | null> {
+  const state = $studioState.get()
+
+  if (!state.runContext.goalEnabled) {
+    return null
+  }
+
+  return `/goal ${await studioPromptTextForSession(text, sessionId, requestGateway)}`
 }

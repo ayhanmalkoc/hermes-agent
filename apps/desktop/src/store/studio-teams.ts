@@ -3,7 +3,7 @@ import { atom, computed } from 'nanostores'
 import { readKey, writeKey } from '@/lib/storage'
 
 const TEAMS_STORAGE_KEY = 'hermes.desktop.studio.teams'
-const ASSIGNMENTS_STORAGE_KEY = 'hermes.desktop.studio.teamAssignments'
+const DRAFT_ASSIGNMENT_STORAGE_KEY = 'hermes.desktop.studio.teamDraftAssignment'
 export const DRAFT_STUDIO_SESSION_KEY = 'draft'
 
 export interface StudioTeam {
@@ -12,6 +12,16 @@ export interface StudioTeam {
   instructions: string
   name: string
   profileIds: string[]
+}
+
+export type StudioTeamGateway = <T = unknown>(
+  method: string,
+  params?: Record<string, unknown>,
+  timeoutMs?: number
+) => Promise<T>
+
+interface StudioTeamResponse {
+  team?: null | StudioTeam
 }
 
 function parseJson<T>(raw: null | string, fallback: T): T {
@@ -42,28 +52,21 @@ function normalizeTeams(value: unknown): StudioTeam[] {
   return Array.isArray(value) ? value.map(normalizeTeam).filter((team): team is StudioTeam => Boolean(team)) : []
 }
 
-function normalizeAssignments(value: unknown): Record<string, string> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
-
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .map(([sessionKey, teamId]) => [sessionKey, typeof teamId === 'string' ? teamId : ''])
-      .filter(([, teamId]) => teamId)
-  )
-}
-
 function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `team-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function sessionKey(value: null | string | undefined): string {
-  return value?.trim() || DRAFT_STUDIO_SESSION_KEY
+function readDraftTeamId(): null | string {
+  const value = readKey(DRAFT_ASSIGNMENT_STORAGE_KEY)?.trim()
+  return value || null
+}
+
+function writeDraftTeamId(teamId: null | string): void {
+  writeKey(DRAFT_ASSIGNMENT_STORAGE_KEY, teamId?.trim() || '')
 }
 
 export const $studioTeams = atom<StudioTeam[]>(normalizeTeams(parseJson(readKey(TEAMS_STORAGE_KEY), [])))
-export const $studioTeamAssignments = atom<Record<string, string>>(
-  normalizeAssignments(parseJson(readKey(ASSIGNMENTS_STORAGE_KEY), {}))
-)
+export const $studioTeamAssignments = atom<Record<string, string>>(readDraftTeamId() ? { draft: readDraftTeamId()! } : {})
 
 export const $studioTeamsById = computed($studioTeams, teams => new Map(teams.map(team => [team.id, team])))
 
@@ -72,9 +75,15 @@ function saveTeams(teams: StudioTeam[]): void {
   writeKey(TEAMS_STORAGE_KEY, JSON.stringify(teams))
 }
 
-function saveAssignments(assignments: Record<string, string>): void {
-  $studioTeamAssignments.set(assignments)
-  writeKey(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(assignments))
+function updateCachedAssignment(sessionId: null | string | undefined, teamId: null | string): void {
+  const key = sessionId?.trim() || DRAFT_STUDIO_SESSION_KEY
+  const next = { ...$studioTeamAssignments.get() }
+
+  if (teamId) next[key] = teamId
+  else delete next[key]
+
+  $studioTeamAssignments.set(next)
+  if (key === DRAFT_STUDIO_SESSION_KEY) writeDraftTeamId(teamId)
 }
 
 export function createStudioTeam(input: Omit<StudioTeam, 'id'>): StudioTeam {
@@ -90,41 +99,73 @@ export function updateStudioTeam(id: string, patch: Partial<Omit<StudioTeam, 'id
 
 export function deleteStudioTeam(id: string): void {
   saveTeams($studioTeams.get().filter(team => team.id !== id))
-  saveAssignments(Object.fromEntries(Object.entries($studioTeamAssignments.get()).filter(([, teamId]) => teamId !== id)))
+  const next = Object.fromEntries(Object.entries($studioTeamAssignments.get()).filter(([, teamId]) => teamId !== id))
+  $studioTeamAssignments.set(next)
+  if (readDraftTeamId() === id) writeDraftTeamId(null)
 }
 
-export function setStudioTeamForSession(sessionId: null | string | undefined, teamId: null | string): void {
-  const key = sessionKey(sessionId)
-  const next = { ...$studioTeamAssignments.get() }
+export async function setStudioTeamForSession(
+  sessionId: null | string | undefined,
+  teamId: null | string,
+  requestGateway?: StudioTeamGateway
+): Promise<void> {
+  const sid = sessionId?.trim() || ''
+  const team = teamId ? ($studioTeamsById.get().get(teamId) ?? null) : null
 
-  if (teamId) next[key] = teamId
-  else delete next[key]
+  updateCachedAssignment(sid || null, team?.id ?? null)
 
-  saveAssignments(next)
+  if (!sid || !requestGateway) return
+
+  await requestGateway('studio.team.set', { session_id: sid, team })
 }
 
 export function getStudioTeamForSession(sessionId: null | string | undefined): StudioTeam | null {
-  const teamId = $studioTeamAssignments.get()[sessionKey(sessionId)]
+  const teamId = $studioTeamAssignments.get()[sessionId?.trim() || DRAFT_STUDIO_SESSION_KEY]
 
   return teamId ? ($studioTeamsById.get().get(teamId) ?? null) : null
 }
 
-export function bindDraftStudioTeamToSession(sessionId: null | string | undefined): void {
-  const key = sessionKey(sessionId)
+export async function getStudioTeamForSessionRuntime(
+  sessionId: null | string | undefined,
+  requestGateway?: StudioTeamGateway
+): Promise<StudioTeam | null> {
+  const sid = sessionId?.trim() || ''
 
-  if (!sessionId?.trim() || key === DRAFT_STUDIO_SESSION_KEY) return
+  if (!sid || !requestGateway) return getStudioTeamForSession(sessionId)
 
-  const assignments = $studioTeamAssignments.get()
-  const draftTeamId = assignments[DRAFT_STUDIO_SESSION_KEY]
+  const cached = getStudioTeamForSession(sid)
 
-  if (!draftTeamId || assignments[key]) return
-
-  saveAssignments({ ...assignments, [key]: draftTeamId })
+  try {
+    const result = await requestGateway<StudioTeamResponse>('studio.team.get', { session_id: sid })
+    const team = normalizeTeam(result?.team)
+    if (team) updateCachedAssignment(sid, team.id)
+    return team ?? cached
+  } catch {
+    return cached
+  }
 }
 
-export function studioTeamPromptContext(sessionId: null | string | undefined): string {
-  const team = getStudioTeamForSession(sessionId)
+export async function bindDraftStudioTeamToSession(
+  sessionId: null | string | undefined,
+  requestGateway?: StudioTeamGateway
+): Promise<void> {
+  const sid = sessionId?.trim() || ''
 
+  if (!sid) return
+
+  const draftTeamId = $studioTeamAssignments.get()[DRAFT_STUDIO_SESSION_KEY] || readDraftTeamId()
+  const current = getStudioTeamForSession(sid)
+
+  if (!draftTeamId || current) return
+  if (!$studioTeamsById.get().has(draftTeamId)) {
+    updateCachedAssignment(null, null)
+    return
+  }
+
+  await setStudioTeamForSession(sid, draftTeamId, requestGateway)
+}
+
+export function studioTeamPromptContextFromTeam(team: null | StudioTeam): string {
   if (!team) return ''
 
   const members = team.profileIds.length ? team.profileIds.join(', ') : 'No explicit members selected'
@@ -141,4 +182,15 @@ export function studioTeamPromptContext(sessionId: null | string | undefined): s
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+export function studioTeamPromptContext(sessionId: null | string | undefined): string {
+  return studioTeamPromptContextFromTeam(getStudioTeamForSession(sessionId))
+}
+
+export async function studioTeamPromptContextForSession(
+  sessionId: null | string | undefined,
+  requestGateway?: StudioTeamGateway
+): Promise<string> {
+  return studioTeamPromptContextFromTeam(await getStudioTeamForSessionRuntime(sessionId, requestGateway))
 }

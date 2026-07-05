@@ -693,7 +693,7 @@ export function ChatBar({
     </>
   )
 
-  const teamSelector = <StudioTeamButton sessionId={sessionId} />
+  const teamSelector = <StudioTeamButton gateway={gateway} sessionId={sessionId} />
 
   const controls = (
     <ComposerControls

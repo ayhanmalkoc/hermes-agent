@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { textPart } from '@/lib/chat-messages'
 import { $composerAttachments, $composerDraft, type ComposerAttachment, setComposerDraft } from '@/store/composer'
 import { $busy, $connection, $messages, $sessions, setSessions } from '@/store/session'
-import { updateStudioRunContext } from '@/store/studio'
+import { setStudioModeEnabled, updateStudioRunContext } from '@/store/studio'
 import { $studioTeamAssignments, $studioTeams, createStudioTeam, setStudioTeamForSession } from '@/store/studio-teams'
 import type { SessionInfo } from '@/types/hermes'
 
@@ -220,6 +220,7 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
     $busy.set(false)
     $studioTeams.set([])
     $studioTeamAssignments.set({})
+    setStudioModeEnabled(false)
     updateStudioRunContext({ goalEnabled: false })
     vi.restoreAllMocks()
   })
@@ -323,6 +324,7 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
   })
 
   it('includes selected team context in studio goal kickoff', async () => {
+    setStudioModeEnabled(true)
     updateStudioRunContext({ goalEnabled: true })
     const team = createStudioTeam({
       description: 'QA coverage',
@@ -357,14 +359,15 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
 
     expect(await handle!.submitText('check the release')).toBe(true)
 
-    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['command.dispatch', 'prompt.submit']))
-    expect(calls[0]?.params?.arg).toContain('Studio team context:')
-    expect(calls[0]?.params?.arg).toContain('Team: QA Team')
-    expect(calls[0]?.params?.arg).toContain('check the release')
-    expect(calls[1]?.params?.text).toContain('Studio team context:')
+    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['studio.team.get', 'command.dispatch', 'prompt.submit']))
+    expect(calls[1]?.params?.arg).toContain('Studio team context:')
+    expect(calls[1]?.params?.arg).toContain('Team: QA Team')
+    expect(calls[1]?.params?.arg).toContain('check the release')
+    expect(calls[2]?.params?.text).toContain('Studio team context:')
   })
 
   it('carries a draft team selection into the first prompt submit', async () => {
+    setStudioModeEnabled(true)
     const team = createStudioTeam({
       description: 'Cross-functional delivery',
       instructions: 'Delegate to the listed profiles by profile_id.',
@@ -392,11 +395,12 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
 
     expect(await handle!.submitText('plan the launch')).toBe(true)
 
-    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['prompt.submit']))
-    expect(calls[0]?.params?.text).toContain('Studio team context:')
-    expect(calls[0]?.params?.text).toContain('Team: Delivery Team')
-    expect(calls[0]?.params?.text).toContain('Members: planner, coder')
-    expect(calls[0]?.params?.text).toContain('plan the launch')
+    await waitFor(() => expect(calls.map(c => c.method)).toEqual(['studio.team.set', 'studio.team.get', 'prompt.submit']))
+    expect(calls[0]?.params).toEqual({ session_id: RUNTIME_SESSION_ID, team })
+    expect(calls[2]?.params?.text).toContain('Studio team context:')
+    expect(calls[2]?.params?.text).toContain('Team: Delivery Team')
+    expect(calls[2]?.params?.text).toContain('Members: planner, coder')
+    expect(calls[2]?.params?.text).toContain('plan the launch')
     expect($studioTeamAssignments.get()[RUNTIME_SESSION_ID]).toBe(team.id)
   })
 
