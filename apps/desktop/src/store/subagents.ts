@@ -187,13 +187,25 @@ function toProgress(payload: SubagentPayload, prev: SubagentProgress | undefined
 
 export function clearSessionSubagents(sid: string) {
   const map = $subagentsBySession.get()
+  const list = map[sid]
 
-  if (!(sid in map)) {
+  if (!list?.length) {
     return
   }
 
-  const { [sid]: _drop, ...rest } = map
-  $subagentsBySession.set(rest)
+  const terminal = list.filter(item => TERMINAL.has(item.status))
+
+  if (terminal.length === list.length) {
+    return
+  }
+
+  if (terminal.length === 0) {
+    const { [sid]: _drop, ...rest } = map
+    $subagentsBySession.set(rest)
+    return
+  }
+
+  $subagentsBySession.set({ ...map, [sid]: terminal })
 }
 
 export function pruneDelegateFallbackSubagents(sid: string) {

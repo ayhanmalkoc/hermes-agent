@@ -13,7 +13,6 @@ import { cn } from '@/lib/utils'
 import { getSessionMessages } from '@/hermes'
 import {
   $subagentsBySession,
-  allSubagents,
   buildSubagentTree,
   type SubagentNode,
   type SubagentStatus,
@@ -128,16 +127,11 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
   const { t } = useI18n()
   const subagentsBySession = useStore($subagentsBySession)
   const [runs, setRuns] = useState<StudioAgentRun[]>([])
+  const [runsLoading, setRunsLoading] = useState(false)
   const [selectedRun, setSelectedRun] = useState<StudioAgentRun | null>(null)
   const [replayMessages, setReplayMessages] = useState<SessionMessage[]>([])
   const [loadingReplay, setLoadingReplay] = useState(false)
 
-  // Aggregate every session, matching the status-bar indicator — a subagent
-  // running in a background session must still be visible here, or the two
-  // desync ("Agents N running" vs an empty tree).
-  const tree = useMemo(() => buildSubagentTree(allSubagents(subagentsBySession)), [subagentsBySession])
-  const flat = useMemo(() => flatten(tree), [tree])
-  const runningTree = useMemo(() => buildSubagentTree(flat.filter(node => isRunningStatus(node.status))), [flat])
   const activeSessionItems = parentSessionId ? (subagentsBySession[parentSessionId] ?? []) : []
   const hydrateKey = useMemo(
     () =>
@@ -150,6 +144,10 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
   )
   const activeSessionTree = useMemo(() => buildSubagentTree(activeSessionItems), [activeSessionItems])
   const activeSessionFlat = useMemo(() => flatten(activeSessionTree), [activeSessionTree])
+  const runningTree = useMemo(
+    () => buildSubagentTree(activeSessionFlat.filter(node => isRunningStatus(node.status))),
+    [activeSessionFlat]
+  )
   const completedLive = useMemo(
     () => activeSessionFlat.filter(node => !isRunningStatus(node.status) && node.sessionId),
     [activeSessionFlat]
@@ -163,10 +161,12 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
   useEffect(() => {
     if (!parentSessionId) {
       setRuns([])
+      setRunsLoading(false)
       return
     }
 
     let cancelled = false
+    setRunsLoading(true)
 
     requestGateway<{ runs?: StudioAgentRun[] }>('studio.agent_runs', { parent_session_id: parentSessionId })
       .then(result => {
@@ -177,6 +177,11 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
       .catch(() => {
         if (!cancelled) {
           setRuns([])
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRunsLoading(false)
         }
       })
 
@@ -245,7 +250,7 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
 
   return (
     <Panel closeLabel={t.agents.close} onClose={onClose}>
-      {runningTree.length === 0 && completedLive.length === 0 && completedRuns.length === 0 ? (
+      {runningTree.length === 0 && completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
         <PanelEmpty description={t.agents.emptyDesc} icon="hubot" title={t.agents.emptyTitle} />
       ) : (
         <>
@@ -265,7 +270,10 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
                   {completedRuns.map(run => (
                     <CompletedRunRow key={run.id} onOpen={openReplay} run={run} />
                   ))}
-                  {completedLive.length === 0 && completedRuns.length === 0 ? (
+                  {runsLoading && completedLive.length === 0 && completedRuns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground/65">Loading completed runs…</p>
+                  ) : null}
+                  {completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
                     <p className="text-xs text-muted-foreground/65">No completed runs for this session.</p>
                   ) : null}
                 </div>

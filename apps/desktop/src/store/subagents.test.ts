@@ -145,4 +145,13 @@ describe('subagent store', () => {
     expect($subagentsBySession.get().s1).toBeUndefined()
     expect($subagentsBySession.get().s2).toHaveLength(1)
   })
+
+  it('keeps terminal runs when clearing a session for a new parent message', () => {
+    upsertSubagent('s1', { goal: 'done', status: 'completed', subagent_id: 'done', task_index: 0 })
+    upsertSubagent('s1', { goal: 'live', status: 'running', subagent_id: 'live', task_index: 1 })
+
+    clearSessionSubagents('s1')
+
+    expect(listFor('s1').map(item => item.id)).toEqual(['done'])
+  })
 })
