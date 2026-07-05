@@ -693,7 +693,7 @@ export function ChatBar({
     </>
   )
 
-  const teamSelector = <StudioTeamButton className="ml-3" sessionId={sessionId} />
+  const teamSelector = <StudioTeamButton sessionId={sessionId} />
 
   const controls = (
     <ComposerControls
@@ -980,7 +980,7 @@ export function ChatBar({
                   </div>
                 )}
                 {attachments.length > 0 && <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />}
-                {teamSelector}
+                <div className="flex w-fit items-center pl-3">{teamSelector}</div>
                 <div
                   className={cn(
                     'grid w-full',
