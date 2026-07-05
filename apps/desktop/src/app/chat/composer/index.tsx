@@ -980,7 +980,7 @@ export function ChatBar({
                   </div>
                 )}
                 {attachments.length > 0 && <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />}
-                <div className="flex w-fit items-center pl-3">{teamSelector}</div>
+                <div className="flex w-fit items-center pl-1">{teamSelector}</div>
                 <div
                   className={cn(
                     'grid w-full',

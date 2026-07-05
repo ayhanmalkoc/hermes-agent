@@ -29,11 +29,11 @@ export function StudioTeamButton({ className, sessionId }: StudioTeamButtonProps
     >
       <SelectTrigger
         aria-label="Team"
-        className={cn('h-7 w-7 rounded-full px-0 [&>svg:last-child]:hidden', className)}
+        className={cn('h-7 w-auto rounded-full px-2 text-xs', className)}
         title="Team"
       >
         <Codicon aria-hidden="true" name="organization" size="0.9rem" />
-        <SelectValue className="sr-only" placeholder="Team" />
+        <SelectValue placeholder="Team" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NO_TEAM}>No team</SelectItem>
