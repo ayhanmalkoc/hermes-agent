@@ -11,7 +11,6 @@ import { AlertCircle, CheckCircle2 } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
 import { getSessionMessages } from '@/hermes'
-import { $activeSessionId } from '@/store/session'
 import {
   $subagentsBySession,
   allSubagents,
@@ -78,6 +77,7 @@ function streamGlyph(entry: SubagentStreamEntry): ReactNode {
 
 interface SubagentsViewProps {
   onClose: () => void
+  parentSessionId: null | string
   requestGateway: GatewayRequester
 }
 
@@ -124,10 +124,9 @@ function messageText(message: SessionMessage): string {
   return typeof message.text === 'string' ? message.text : ''
 }
 
-export function SubagentsView({ onClose, requestGateway }: SubagentsViewProps) {
+export function SubagentsView({ onClose, parentSessionId, requestGateway }: SubagentsViewProps) {
   const { t } = useI18n()
   const subagentsBySession = useStore($subagentsBySession)
-  const activeSessionId = useStore($activeSessionId)
   const [runs, setRuns] = useState<StudioAgentRun[]>([])
   const [selectedRun, setSelectedRun] = useState<StudioAgentRun | null>(null)
   const [replayMessages, setReplayMessages] = useState<SessionMessage[]>([])
@@ -139,7 +138,7 @@ export function SubagentsView({ onClose, requestGateway }: SubagentsViewProps) {
   const tree = useMemo(() => buildSubagentTree(allSubagents(subagentsBySession)), [subagentsBySession])
   const flat = useMemo(() => flatten(tree), [tree])
   const runningTree = useMemo(() => buildSubagentTree(flat.filter(node => isRunningStatus(node.status))), [flat])
-  const activeSessionItems = activeSessionId ? (subagentsBySession[activeSessionId] ?? []) : []
+  const activeSessionItems = parentSessionId ? (subagentsBySession[parentSessionId] ?? []) : []
   const activeSessionTree = useMemo(() => buildSubagentTree(activeSessionItems), [activeSessionItems])
   const activeSessionFlat = useMemo(() => flatten(activeSessionTree), [activeSessionTree])
   const completedLive = useMemo(
@@ -153,14 +152,14 @@ export function SubagentsView({ onClose, requestGateway }: SubagentsViewProps) {
   )
 
   useEffect(() => {
-    if (!activeSessionId) {
+    if (!parentSessionId) {
       setRuns([])
       return
     }
 
     let cancelled = false
 
-    requestGateway<{ runs?: StudioAgentRun[] }>('studio.agent_runs', { parent_session_id: activeSessionId })
+    requestGateway<{ runs?: StudioAgentRun[] }>('studio.agent_runs', { parent_session_id: parentSessionId })
       .then(result => {
         if (!cancelled) {
           setRuns(Array.isArray(result.runs) ? result.runs : [])
@@ -175,7 +174,7 @@ export function SubagentsView({ onClose, requestGateway }: SubagentsViewProps) {
     return () => {
       cancelled = true
     }
-  }, [activeSessionId, requestGateway])
+  }, [parentSessionId, requestGateway])
 
   const openReplay = async (run: StudioAgentRun) => {
     setSelectedRun(run)

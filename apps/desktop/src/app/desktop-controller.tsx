@@ -1033,7 +1033,11 @@ export function DesktopController() {
 
       {subagentsOpen && (
         <Suspense fallback={null}>
-          <SubagentsView onClose={closeSubagents} requestGateway={requestGateway} />
+          <SubagentsView
+            onClose={closeSubagents}
+            parentSessionId={selectedStoredSessionId || activeSessionId || null}
+            requestGateway={requestGateway}
+          />
         </Suspense>
       )}
 
