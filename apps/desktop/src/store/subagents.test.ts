@@ -26,6 +26,20 @@ describe('subagent store', () => {
     expect(item?.summary).toBe('done')
   })
 
+  it('stores optional profile identity from live subagent events', () => {
+    upsertSubagent('s1', {
+      goal: 'review UI',
+      profile_id: 'qa',
+      profile_name: 'QA Agent',
+      status: 'running',
+      subagent_id: 'a1',
+      task_index: 0
+    })
+
+    expect(listFor('s1')[0]?.profileId).toBe('qa')
+    expect(listFor('s1')[0]?.profileName).toBe('QA Agent')
+  })
+
   it('builds parent/child trees', () => {
     upsertSubagent('s1', { goal: 'parent', status: 'running', subagent_id: 'p', task_index: 0 })
     upsertSubagent('s1', { goal: 'child', parent_id: 'p', status: 'queued', subagent_id: 'c', task_index: 1 })

@@ -123,7 +123,8 @@ export function studioTeamPromptContext(sessionId: null | string | undefined): s
     team.description ? `Description: ${team.description}` : '',
     `Members: ${members}`,
     `Instructions: ${instructions}`,
-    'The active Hermes profile is the lead/manager. Use existing delegate_task/subagents when useful.'
+    'The active Hermes profile is the lead/manager.',
+    'When delegating to a listed member, call delegate_task with that member id as tasks[].profile_id (or profile_id for a single task) so the child run uses the member profile runtime.'
   ]
     .filter(Boolean)
     .join('\n')

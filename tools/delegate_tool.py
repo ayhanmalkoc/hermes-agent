@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 import os
 import threading
 import time
+from contextlib import contextmanager
 from concurrent.futures import (
     ThreadPoolExecutor,
     TimeoutError as FuturesTimeoutError,
@@ -39,6 +40,46 @@ _RUNTIME_PROVIDER_CUSTOM = "custom"
 from tools import file_state
 from tools.terminal_tool import set_approval_callback as _set_subagent_approval_cb
 from utils import base_url_hostname, is_truthy_value
+
+
+def _normalize_profile_id(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return "default" if text in {"main", "primary"} else text
+
+
+def _profile_home_for(profile_id: Optional[str]):
+    profile = _normalize_profile_id(profile_id)
+    if not profile:
+        return None
+
+    from hermes_constants import get_default_hermes_root, get_hermes_home
+
+    if profile == "default":
+        return get_default_hermes_root()
+    current_home = get_hermes_home()
+    if current_home.parent.name == "profiles" and current_home.name == profile:
+        return current_home
+    return get_default_hermes_root() / "profiles" / profile
+
+
+@contextmanager
+def _scoped_profile_home(profile_id: Optional[str]):
+    home = _profile_home_for(profile_id)
+    if home is None:
+        yield
+        return
+
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    token = set_hermes_home_override(home)
+    try:
+        yield
+    finally:
+        reset_hermes_home_override(token)
 
 
 # Tools that children must never have access to
@@ -813,6 +854,8 @@ def _build_child_progress_callback(
     model: Optional[str] = None,
     toolsets: Optional[List[str]] = None,
     session_ref: Optional[Dict[str, Any]] = None,
+    profile_id: Optional[str] = None,
+    profile_name: Optional[str] = None,
 ) -> Optional[callable]:
     """Build a callback that relays child agent tool calls to the parent display.
 
@@ -860,6 +903,10 @@ def _build_child_progress_callback(
             kw["model"] = model
         if toolsets is not None:
             kw["toolsets"] = list(toolsets)
+        if profile_id is not None:
+            kw["profile_id"] = profile_id
+        if profile_name is not None:
+            kw["profile_name"] = profile_name
         # The child's own session id — filled into the shared ref once the
         # child agent exists (the callback is built first), so every relayed
         # event lets UIs open/inspect the subagent's session directly.
@@ -1062,6 +1109,8 @@ def _build_child_agent(
     # 'leaf' (default) cannot; 'orchestrator' retains the delegation
     # toolset subject to depth/kill-switch bounds applied below.
     role: str = "leaf",
+    target_profile_id: Optional[str] = None,
+    target_profile_name: Optional[str] = None,
 ):
     """
     Build a child AIAgent on the main thread (thread-safe construction).
@@ -1096,6 +1145,9 @@ def _build_child_agent(
     tui_depth = max(0, child_depth - 1)  # 0 = first-level child for the UI
 
     delegation_cfg = _load_config()
+    target_profile_id = _normalize_profile_id(target_profile_id)
+    target_profile_name = str(target_profile_name or target_profile_id or "").strip() or None
+    profile_bound = bool(target_profile_id)
 
     # When no explicit toolsets given, inherit from parent's enabled toolsets
     # so disabled tools (e.g. web) don't leak to subagents.
@@ -1162,6 +1214,8 @@ def _build_child_agent(
     # Identity kwargs thread the subagent_id through every emitted event so the
     # TUI can reconstruct the spawn tree and route per-branch controls.
     child_session_ref: Dict[str, Any] = {}
+    child_enabled_toolsets = None if profile_bound else child_toolsets
+
     child_progress_cb = _build_child_progress_callback(
         task_index,
         goal,
@@ -1171,8 +1225,10 @@ def _build_child_agent(
         parent_id=parent_subagent_id,
         depth=tui_depth,
         model=effective_model_for_cb,
-        toolsets=child_toolsets,
+        toolsets=child_enabled_toolsets if child_enabled_toolsets is not None else child_toolsets,
         session_ref=child_session_ref,
+        profile_id=target_profile_id,
+        profile_name=target_profile_name,
     )
 
     # Each subagent gets its own iteration budget capped at max_iterations
@@ -1194,12 +1250,12 @@ def _build_child_agent(
         child_thinking_cb = _child_thinking
 
     # Resolve effective credentials: config override > parent inherit
-    effective_model = model or parent_agent.model
-    effective_provider = override_provider or getattr(parent_agent, "provider", None)
-    effective_base_url = override_base_url or parent_agent.base_url
+    effective_model = model or ("" if profile_bound else parent_agent.model)
+    effective_provider = override_provider or (None if profile_bound else getattr(parent_agent, "provider", None))
+    effective_base_url = override_base_url or (None if profile_bound else parent_agent.base_url)
     if not override_base_url:
         effective_base_url = _inherit_parent_base_url(parent_agent, effective_base_url)
-    effective_api_key = override_api_key or parent_api_key
+    effective_api_key = override_api_key or (None if profile_bound else parent_api_key)
     # Bug #20558 / PR #20563: api_mode must NOT be inherited when the child uses a
     # different provider than the parent — each provider has its own API surface
     # (e.g. MiniMax uses anthropic_messages, DeepSeek uses chat_completions).
@@ -1297,38 +1353,47 @@ def _build_child_agent(
         # openrouter/pareto-code), so we keep it inherited even when the
         # provider is overridden — it's a no-op on any other model.
 
-    child = AIAgent(
-        base_url=effective_base_url,
-        api_key=effective_api_key,
-        model=effective_model,
-        provider=effective_provider,
-        api_mode=effective_api_mode,
-        acp_command=effective_acp_command,
-        acp_args=effective_acp_args,
-        max_iterations=max_iterations,
-        max_tokens=getattr(parent_agent, "max_tokens", None),
-        reasoning_config=child_reasoning,
-        prefill_messages=getattr(parent_agent, "prefill_messages", None),
-        fallback_model=parent_fallback,
-        enabled_toolsets=child_toolsets,
-        quiet_mode=True,
-        ephemeral_system_prompt=child_prompt,
-        log_prefix=f"[subagent-{task_index}]",
-        platform="subagent",
-        skip_context_files=True,
-        skip_memory=True,
-        clarify_callback=None,
-        thinking_callback=child_thinking_cb,
-        session_db=getattr(parent_agent, "_session_db", None),
-        parent_session_id=getattr(parent_agent, "session_id", None),
-        providers_allowed=child_providers_allowed,
-        providers_ignored=child_providers_ignored,
-        providers_order=child_providers_order,
-        provider_sort=child_provider_sort,
-        openrouter_min_coding_score=child_openrouter_min_coding_score,
-        tool_progress_callback=child_progress_cb,
-        iteration_budget=None,  # fresh budget per subagent
-    )
+    with _scoped_profile_home(target_profile_id):
+        child_session_db = getattr(parent_agent, "_session_db", None)
+        child_parent_session_id = getattr(parent_agent, "session_id", None)
+        if profile_bound:
+            from hermes_state import SessionDB
+
+            child_session_db = SessionDB()
+            child_parent_session_id = None
+
+        child = AIAgent(
+            base_url=effective_base_url,
+            api_key=effective_api_key,
+            model=effective_model,
+            provider=effective_provider,
+            api_mode=effective_api_mode,
+            acp_command=effective_acp_command,
+            acp_args=effective_acp_args,
+            max_iterations=max_iterations,
+            max_tokens=getattr(parent_agent, "max_tokens", None),
+            reasoning_config=child_reasoning,
+            prefill_messages=getattr(parent_agent, "prefill_messages", None),
+            fallback_model=parent_fallback,
+            enabled_toolsets=child_enabled_toolsets,
+            quiet_mode=True,
+            ephemeral_system_prompt=child_prompt,
+            log_prefix=f"[subagent-{task_index}]",
+            platform="subagent",
+            skip_context_files=True,
+            skip_memory=True,
+            clarify_callback=None,
+            thinking_callback=child_thinking_cb,
+            session_db=child_session_db,
+            parent_session_id=child_parent_session_id,
+            providers_allowed=child_providers_allowed,
+            providers_ignored=child_providers_ignored,
+            providers_order=child_providers_order,
+            provider_sort=child_provider_sort,
+            openrouter_min_coding_score=child_openrouter_min_coding_score,
+            tool_progress_callback=child_progress_cb,
+            iteration_budget=None,  # fresh budget per subagent
+        )
     child._print_fn = getattr(parent_agent, "_print_fn", None)
     # Now the child exists, its session id can ride on every relayed event
     # (including the spawn_requested below — first emit happens after this).
@@ -1344,13 +1409,26 @@ def _build_child_agent(
     child._parent_subagent_id = parent_subagent_id
     child._subagent_goal = goal
     child._parent_turn_id = getattr(parent_agent, "_current_turn_id", "") or ""
+    child._studio_profile_id = target_profile_id
+    child._studio_profile_name = target_profile_name
     # Stable sidebar marker: delegate subagent sessions must stay out of
     # session pickers even when a parent delete orphans them (parent_session_id
     # → NULL). Mirrors /branch's ``_branched_from`` pattern — see
     # ``list_sessions_rich`` child-exclusion clause.
     parent_sid = getattr(parent_agent, "session_id", None)
     if parent_sid and getattr(child, "_session_init_model_config", None) is not None:
-        child._session_init_model_config["_delegate_from"] = parent_sid
+        if profile_bound:
+            child._session_init_model_config.update(
+                {
+                    "_studio_agent_run": True,
+                    "_studio_parent_session_id": parent_sid,
+                    "_studio_profile_id": target_profile_id,
+                    "_studio_profile_name": target_profile_name or target_profile_id,
+                    "_studio_run_role": "team_agent",
+                }
+            )
+        else:
+            child._session_init_model_config["_delegate_from"] = parent_sid
 
     # Share a credential pool with the child when possible so subagents can
     # rotate credentials on rate limits instead of getting pinned to one key.
@@ -1855,6 +1933,8 @@ def _run_single_child(
                     if isinstance(getattr(child, "model", None), str)
                     else None
                 ),
+                "profile_id": getattr(child, "_studio_profile_id", None),
+                "profile_name": getattr(child, "_studio_profile_name", None),
                 "started_at": time.time(),
                 "status": "running",
                 "tool_count": 0,
@@ -1917,11 +1997,12 @@ def _run_single_child(
 
         def _run_with_thread_capture():
             _worker_thread_holder["t"] = threading.current_thread()
-            return child.run_conversation(
-                user_message=goal,
-                task_id=child_task_id,
-                stream_callback=_relay_child_text,
-            )
+            with _scoped_profile_home(getattr(child, "_studio_profile_id", None)):
+                return child.run_conversation(
+                    user_message=goal,
+                    task_id=child_task_id,
+                    stream_callback=_relay_child_text,
+                )
 
         _child_future = _timeout_executor.submit(_run_with_thread_capture)
         try:
@@ -2342,6 +2423,8 @@ def delegate_task(
     goal: Optional[str] = None,
     context: Optional[str] = None,
     tasks: Optional[List[Dict[str, Any]]] = None,
+    profile_id: Optional[str] = None,
+    profile_name: Optional[str] = None,
     max_iterations: Optional[int] = None,
     acp_command: Optional[str] = None,
     acp_args: Optional[List[str]] = None,
@@ -2447,7 +2530,15 @@ def delegate_task(
             )
         task_list = tasks
     elif goal and isinstance(goal, str) and goal.strip():
-        task_list = [{"goal": goal, "context": context, "role": top_role}]
+        task_list = [
+            {
+                "goal": goal,
+                "context": context,
+                "role": top_role,
+                "profile_id": profile_id,
+                "profile_name": profile_name,
+            }
+        ]
     else:
         return tool_error("Provide either 'goal' (single task) or 'tasks' (batch).")
 
@@ -2511,6 +2602,8 @@ def delegate_task(
                     else (acp_args if acp_args is not None else creds.get("args"))
                 ),
                 role=effective_role,
+                target_profile_id=t.get("profile_id") or t.get("profileId"),
+                target_profile_name=t.get("profile_name") or t.get("profileName"),
             )
             # Override with correct parent tool names (before child construction mutated global)
             child._delegate_saved_tool_names = _parent_tool_names
@@ -3416,6 +3509,17 @@ DELEGATE_TASK_SCHEMA = {
                             "enum": ["leaf", "orchestrator"],
                             "description": "Per-task role override. See top-level 'role' for semantics.",
                         },
+                        "profile_id": {
+                            "type": "string",
+                            "description": (
+                                "Optional Studio team member profile id. Only set when the user or Studio "
+                                "team context explicitly provides profile ids for delegation."
+                            ),
+                        },
+                        "profile_name": {
+                            "type": "string",
+                            "description": "Optional human-readable Studio team member/profile name for UI display.",
+                        },
                     },
                     "required": ["goal"],
                 },
@@ -3428,6 +3532,17 @@ DELEGATE_TASK_SCHEMA = {
                 "type": "string",
                 "enum": ["leaf", "orchestrator"],
                 "description": "(rebuilt at get_definitions() time)",
+            },
+            "profile_id": {
+                "type": "string",
+                "description": (
+                    "Optional Studio team member profile id for a single delegated task. "
+                    "Leave empty unless Studio/team context explicitly provides one."
+                ),
+            },
+            "profile_name": {
+                "type": "string",
+                "description": "Optional human-readable Studio team member/profile name for UI display.",
             },
             "background": {
                 "type": "boolean",

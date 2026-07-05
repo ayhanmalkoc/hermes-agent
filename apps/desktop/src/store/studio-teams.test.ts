@@ -53,5 +53,7 @@ describe('studio teams store', () => {
 
     expect(studioTeamPromptContext(null)).toContain('No explicit members selected')
     expect(studioTeamPromptContext(null)).toContain('The active Hermes profile is the lead/manager')
+    expect(studioTeamPromptContext(null)).toContain('delegate_task')
+    expect(studioTeamPromptContext(null)).toContain('profile_id')
   })
 })
