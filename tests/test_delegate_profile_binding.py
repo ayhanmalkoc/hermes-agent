@@ -28,7 +28,11 @@ def test_build_child_agent_binds_studio_profile_home(monkeypatch, tmp_path):
     import run_agent
     import hermes_state
 
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path / "root"))
+    root = tmp_path / "root"
+    profile_home = root / "profiles" / "qa"
+    profile_home.mkdir(parents=True)
+    (profile_home / "config.yaml").write_text("model:\n  default: profile-model\n", encoding="utf-8")
+    monkeypatch.setenv("HERMES_HOME", str(root))
     created = {}
 
     class FakeSessionDB:
@@ -60,6 +64,7 @@ def test_build_child_agent_binds_studio_profile_home(monkeypatch, tmp_path):
 
     assert created["session_home"].endswith("profiles/qa")
     assert created["agent_home"].endswith("profiles/qa")
+    assert created["kwargs"]["model"] == "profile-model"
     assert created["kwargs"]["session_db"].__class__ is FakeSessionDB
     assert created["kwargs"]["parent_session_id"] is None
     assert child._session_init_model_config["_studio_agent_run"] is True

@@ -82,6 +82,28 @@ def _scoped_profile_home(profile_id: Optional[str]):
         reset_hermes_home_override(token)
 
 
+def _configured_model_for_profile(profile_id: Optional[str]) -> Optional[str]:
+    if not _normalize_profile_id(profile_id):
+        return None
+    try:
+        with _scoped_profile_home(profile_id):
+            from hermes_cli.config import load_config
+
+            cfg = load_config() or {}
+        model_cfg = cfg.get("model", {})
+        if isinstance(model_cfg, str):
+            return model_cfg.strip() or None
+        if isinstance(model_cfg, dict):
+            for key in ("default", "model", "name"):
+                value = model_cfg.get(key)
+                if isinstance(value, str) and value.strip():
+                    return value.strip()
+        return None
+    except Exception:
+        logger.debug("Could not resolve model for profile %r", profile_id, exc_info=True)
+        return None
+
+
 # Tools that children must never have access to
 DELEGATE_BLOCKED_TOOLS = frozenset(
     [
@@ -1207,8 +1229,9 @@ def _build_child_agent(
     if (not parent_api_key) and hasattr(parent_agent, "_client_kwargs"):
         parent_api_key = parent_agent._client_kwargs.get("api_key")
 
+    profile_config_model = _configured_model_for_profile(target_profile_id) if profile_bound else None
     # Resolve the child's effective model early so it can ride on every event.
-    effective_model_for_cb = model or getattr(parent_agent, "model", None)
+    effective_model_for_cb = model or profile_config_model or getattr(parent_agent, "model", None)
 
     # Build progress callback to relay tool calls to parent display.
     # Identity kwargs thread the subagent_id through every emitted event so the
@@ -1250,7 +1273,7 @@ def _build_child_agent(
         child_thinking_cb = _child_thinking
 
     # Resolve effective credentials: config override > parent inherit
-    effective_model = model or ("" if profile_bound else parent_agent.model)
+    effective_model = model or profile_config_model or parent_agent.model
     effective_provider = override_provider or (None if profile_bound else getattr(parent_agent, "provider", None))
     effective_base_url = override_base_url or (None if profile_bound else parent_agent.base_url)
     if not override_base_url:
