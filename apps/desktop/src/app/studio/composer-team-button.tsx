@@ -1,5 +1,6 @@
 import { useStore } from '@nanostores/react'
 
+import { Codicon } from '@/components/ui/codicon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { $studioTeamAssignments, $studioTeams, setStudioTeamForSession } from '@/store/studio-teams'
 
@@ -24,8 +25,9 @@ export function StudioTeamButton({ sessionId }: StudioTeamButtonProps) {
       onValueChange={next => setStudioTeamForSession(sessionId, next === NO_TEAM ? null : next)}
       value={value}
     >
-      <SelectTrigger aria-label="Team" className="h-8 max-w-40 rounded-full px-2 text-xs">
-        <SelectValue placeholder="Team" />
+      <SelectTrigger aria-label="Team" className="h-8 w-8 rounded-full px-0" title="Team">
+        <Codicon aria-hidden="true" name="organization" size="0.9rem" />
+        <SelectValue className="sr-only" placeholder="Team" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NO_TEAM}>No team</SelectItem>

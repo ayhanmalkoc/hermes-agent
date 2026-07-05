@@ -32,6 +32,7 @@ import { slug } from '@/lib/sanitize'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $profileColors } from '@/store/profile'
+import { $studioTeams, updateStudioTeam } from '@/store/studio-teams'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {
@@ -57,10 +58,11 @@ function isValidProfileName(name: string): boolean {
 
 interface ProfilesViewProps {
   onClose: () => void
+  showTeamLinks?: boolean
   title?: string
 }
 
-export function ProfilesView({ onClose, title }: ProfilesViewProps) {
+export function ProfilesView({ onClose, showTeamLinks = false, title }: ProfilesViewProps) {
   const { t } = useI18n()
   const p = t.profiles
   const [profiles, setProfiles] = useState<null | ProfileInfo[]>(null)
@@ -223,7 +225,7 @@ export function ProfilesView({ onClose, title }: ProfilesViewProps) {
             </PanelList>
 
             {selected ? (
-              <ProfileDetail key={selected.name} profile={selected} />
+              <ProfileDetail key={selected.name} profile={selected} showTeamLinks={showTeamLinks} />
             ) : (
               <PanelEmpty description={p.selectPrompt} icon="account" />
             )}
@@ -338,7 +340,7 @@ function ProfileGlyph({ color, isDefault, name }: { color: null | string; isDefa
   )
 }
 
-function ProfileDetail({ profile }: { profile: ProfileInfo }) {
+function ProfileDetail({ profile, showTeamLinks = false }: { profile: ProfileInfo; showTeamLinks?: boolean }) {
   const { t } = useI18n()
   const p = t.profiles
 
@@ -374,8 +376,48 @@ function ProfileDetail({ profile }: { profile: ProfileInfo }) {
         />
       </header>
 
+      {showTeamLinks && <ProfileTeamLinks profileName={profile.name} />}
+
       <SoulEditor profileName={profile.name} />
     </PanelDetail>
+  )
+}
+
+function ProfileTeamLinks({ profileName }: { profileName: string }) {
+  const teams = useStore($studioTeams)
+
+  const toggleTeam = (teamId: string, checked: boolean) => {
+    const team = teams.find(item => item.id === teamId)
+
+    if (!team) return
+    updateStudioTeam(team.id, {
+      profileIds: checked
+        ? [...new Set([...team.profileIds, profileName])]
+        : team.profileIds.filter(value => value !== profileName)
+    })
+  }
+
+  return (
+    <section className="space-y-2">
+      <PanelSectionLabel>Teams</PanelSectionLabel>
+      {teams.length ? (
+        <div className="grid gap-2">
+          {teams.map(team => (
+            <label className="flex items-center gap-2 text-sm" key={team.id}>
+              <input
+                checked={team.profileIds.includes(profileName)}
+                className="size-4 accent-primary"
+                onChange={event => toggleTeam(team.id, event.target.checked)}
+                type="checkbox"
+              />
+              <span>{team.name}</span>
+            </label>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground/70">No teams yet. Create teams from the Teams view.</p>
+      )}
+    </section>
   )
 }
 

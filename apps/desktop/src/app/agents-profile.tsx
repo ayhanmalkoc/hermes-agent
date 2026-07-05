@@ -5,5 +5,5 @@ interface AgentsProfileViewProps {
 }
 
 export function AgentsProfileView({ onClose }: AgentsProfileViewProps) {
-  return <ProfilesView onClose={onClose} title="Agents" />
+  return <ProfilesView onClose={onClose} showTeamLinks title="Agents" />
 }
