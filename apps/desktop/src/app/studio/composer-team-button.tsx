@@ -4,17 +4,18 @@ import { Codicon } from '@/components/ui/codicon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { HermesGateway } from '@/hermes'
 import { cn } from '@/lib/utils'
-import { $studioTeamAssignments, $studioTeams, setStudioTeamForSession } from '@/store/studio-teams'
+import { $studioTeamAssignments, $studioTeams, setStudioTeamForSessions } from '@/store/studio-teams'
 
 interface StudioTeamButtonProps {
   className?: string
   gateway?: HermesGateway | null
   sessionId?: null | string
+  storedSessionId?: null | string
 }
 
 const NO_TEAM = '__none__'
 
-export function StudioTeamButton({ className, gateway, sessionId }: StudioTeamButtonProps) {
+export function StudioTeamButton({ className, gateway, sessionId, storedSessionId }: StudioTeamButtonProps) {
   const teams = useStore($studioTeams)
   const assignments = useStore($studioTeamAssignments)
   const key = sessionId?.trim() || 'draft'
@@ -27,7 +28,11 @@ export function StudioTeamButton({ className, gateway, sessionId }: StudioTeamBu
   return (
     <Select
       onValueChange={next => {
-        void setStudioTeamForSession(sessionId, next === NO_TEAM ? null : next, gateway?.request.bind(gateway))
+        void setStudioTeamForSessions(
+          [sessionId, storedSessionId],
+          next === NO_TEAM ? null : next,
+          gateway?.request.bind(gateway)
+        )
       }}
       value={value}
     >

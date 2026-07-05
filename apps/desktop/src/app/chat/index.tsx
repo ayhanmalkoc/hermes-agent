@@ -516,6 +516,7 @@ export function ChatView({
               onTranscribeAudio={onTranscribeAudio}
               queueSessionKey={selectedSessionId}
               sessionId={activeSessionId}
+              storedSessionId={selectedSessionId}
               state={chatBarState}
             />
           </Suspense>

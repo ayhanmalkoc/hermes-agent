@@ -7,8 +7,10 @@ import {
   createStudioTeam,
   deleteStudioTeam,
   getStudioTeamForSession,
+  setStudioTeamForSessions,
   setStudioTeamForSession,
   studioTeamPromptContext,
+  studioTeamPromptContextForSessions,
   updateStudioTeam
 } from './studio-teams'
 
@@ -58,7 +60,7 @@ describe('studio teams store', () => {
     expect(studioTeamPromptContext(null)).toContain('profile_id')
   })
 
-  it('binds a draft team selection to the first real session', () => {
+  it('binds a draft team selection to the first real session', async () => {
     const team = createStudioTeam({
       description: 'Product delivery',
       instructions: 'Delegate by profile id.',
@@ -67,10 +69,24 @@ describe('studio teams store', () => {
     })
 
     setStudioTeamForSession(null, team.id)
-    bindDraftStudioTeamToSession('session-new')
+    await bindDraftStudioTeamToSession('session-new')
 
     expect(getStudioTeamForSession('session-new')?.id).toBe(team.id)
     expect(studioTeamPromptContext('session-new')).toContain('Team: Delivery Team')
     expect(studioTeamPromptContext('session-new')).toContain('Members: planner, coder')
+  })
+
+  it('resolves team prompt context across runtime and stored session ids', async () => {
+    const team = createStudioTeam({
+      description: 'Feature delivery',
+      instructions: 'Use selected profiles.',
+      name: 'Feature Team',
+      profileIds: ['coder', 'qa']
+    })
+
+    await setStudioTeamForSessions(['runtime-id', 'stored-id'], team.id)
+
+    expect(await studioTeamPromptContextForSessions(['runtime-id', 'stored-id'])).toContain('Team: Feature Team')
+    expect(await studioTeamPromptContextForSessions(['missing-id', 'stored-id'])).toContain('Members: coder, qa')
   })
 })

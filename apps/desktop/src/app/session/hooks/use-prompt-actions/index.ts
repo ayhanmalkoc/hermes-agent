@@ -21,7 +21,7 @@ import { clearNotifications, notify, notifyError } from '@/store/notifications'
 import { clearPreviewArtifacts } from '@/store/preview-status'
 import { clearAllPrompts } from '@/store/prompts'
 import { $busy, $connection, $messages, setAwaitingResponse, setBusy, setMessages } from '@/store/session'
-import { $studioRunContext, studioGoalCommandForSession } from '@/store/studio'
+import { $studioRunContext, studioGoalCommandForSessions } from '@/store/studio'
 import { bindDraftStudioTeamToSession } from '@/store/studio-teams'
 import { clearSessionSubagents } from '@/store/subagents'
 import { clearSessionTodos } from '@/store/todos'
@@ -473,8 +473,11 @@ export function usePromptActions({
         }
 
         await bindDraftStudioTeamToSession(sessionId, requestGateway)
-        const studioSessionKey = selectedStoredSessionIdRef.current || sessionId
-        const studioGoalText = await studioGoalCommandForSession(visibleText, studioSessionKey, requestGateway)
+        const studioGoalText = await studioGoalCommandForSessions(
+          visibleText,
+          [sessionId, selectedStoredSessionIdRef.current],
+          requestGateway
+        )
         const studioGoalArg = (studioGoalText ?? visibleText).replace(/^\/goal\s*/, '')
 
         const dispatch = parseCommandDispatch(

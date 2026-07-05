@@ -2,7 +2,12 @@ import { atom, computed } from 'nanostores'
 
 import { readKey, writeKey } from '@/lib/storage'
 
-import { studioTeamPromptContext, studioTeamPromptContextForSession, type StudioTeamGateway } from './studio-teams'
+import {
+  studioTeamPromptContext,
+  studioTeamPromptContextForSession,
+  studioTeamPromptContextForSessions,
+  type StudioTeamGateway
+} from './studio-teams'
 
 const STORAGE_KEY = 'hermes.desktop.studio.state'
 
@@ -82,11 +87,19 @@ export async function studioPromptTextForSession(
   sessionId?: null | string,
   requestGateway?: StudioTeamGateway
 ): Promise<string> {
+  return studioPromptTextForSessions(text, [sessionId], requestGateway)
+}
+
+export async function studioPromptTextForSessions(
+  text: string,
+  sessionIds: Array<null | string | undefined>,
+  requestGateway?: StudioTeamGateway
+): Promise<string> {
   if (!$studioState.get().modeEnabled) {
     return text
   }
 
-  const teamContext = await studioTeamPromptContextForSession(sessionId, requestGateway)
+  const teamContext = await studioTeamPromptContextForSessions(sessionIds, requestGateway)
 
   return teamContext ? `${teamContext}\n\nUser request:\n${text}` : text
 }
@@ -104,11 +117,19 @@ export async function studioGoalCommandForSession(
   sessionId?: null | string,
   requestGateway?: StudioTeamGateway
 ): Promise<string | null> {
+  return studioGoalCommandForSessions(text, [sessionId], requestGateway)
+}
+
+export async function studioGoalCommandForSessions(
+  text: string,
+  sessionIds: Array<null | string | undefined>,
+  requestGateway?: StudioTeamGateway
+): Promise<string | null> {
   const state = $studioState.get()
 
   if (!state.runContext.goalEnabled) {
     return null
   }
 
-  return `/goal ${await studioPromptTextForSession(text, sessionId, requestGateway)}`
+  return `/goal ${await studioPromptTextForSessions(text, sessionIds, requestGateway)}`
 }

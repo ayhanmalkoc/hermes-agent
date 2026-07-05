@@ -80,6 +80,7 @@ export function ChatBar({
   maxRecordingSeconds = 120,
   queueSessionKey,
   sessionId,
+  storedSessionId,
   state,
   onCancel,
   onAddUrl,
@@ -693,7 +694,7 @@ export function ChatBar({
     </>
   )
 
-  const teamSelector = <StudioTeamButton gateway={gateway} sessionId={sessionId} />
+  const teamSelector = <StudioTeamButton gateway={gateway} sessionId={sessionId} storedSessionId={storedSessionId} />
 
   const controls = (
     <ComposerControls

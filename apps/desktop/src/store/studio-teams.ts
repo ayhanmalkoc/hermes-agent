@@ -119,6 +119,21 @@ export async function setStudioTeamForSession(
   await requestGateway('studio.team.set', { session_id: sid, team })
 }
 
+export async function setStudioTeamForSessions(
+  sessionIds: Array<null | string | undefined>,
+  teamId: null | string,
+  requestGateway?: StudioTeamGateway
+): Promise<void> {
+  const ids = [...new Set(sessionIds.map(sessionId => sessionId?.trim()).filter((id): id is string => Boolean(id)))]
+
+  if (!ids.length) {
+    await setStudioTeamForSession(null, teamId, requestGateway)
+    return
+  }
+
+  await Promise.all(ids.map(sessionId => setStudioTeamForSession(sessionId, teamId, requestGateway)))
+}
+
 export function getStudioTeamForSession(sessionId: null | string | undefined): StudioTeam | null {
   const teamId = $studioTeamAssignments.get()[sessionId?.trim() || DRAFT_STUDIO_SESSION_KEY]
 
@@ -193,4 +208,18 @@ export async function studioTeamPromptContextForSession(
   requestGateway?: StudioTeamGateway
 ): Promise<string> {
   return studioTeamPromptContextFromTeam(await getStudioTeamForSessionRuntime(sessionId, requestGateway))
+}
+
+export async function studioTeamPromptContextForSessions(
+  sessionIds: Array<null | string | undefined>,
+  requestGateway?: StudioTeamGateway
+): Promise<string> {
+  const ids = [...new Set(sessionIds.map(sessionId => sessionId?.trim()).filter((id): id is string => Boolean(id)))]
+
+  for (const sessionId of ids) {
+    const team = await getStudioTeamForSessionRuntime(sessionId, requestGateway)
+    if (team) return studioTeamPromptContextFromTeam(team)
+  }
+
+  return studioTeamPromptContext(null)
 }
