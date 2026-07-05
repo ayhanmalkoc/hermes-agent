@@ -139,6 +139,15 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
   const flat = useMemo(() => flatten(tree), [tree])
   const runningTree = useMemo(() => buildSubagentTree(flat.filter(node => isRunningStatus(node.status))), [flat])
   const activeSessionItems = parentSessionId ? (subagentsBySession[parentSessionId] ?? []) : []
+  const hydrateKey = useMemo(
+    () =>
+      [
+        parentSessionId ?? '',
+        activeSessionItems.length,
+        ...activeSessionItems.map(item => `${item.id}:${item.status}:${item.updatedAt}`)
+      ].join('|'),
+    [activeSessionItems, parentSessionId]
+  )
   const activeSessionTree = useMemo(() => buildSubagentTree(activeSessionItems), [activeSessionItems])
   const activeSessionFlat = useMemo(() => flatten(activeSessionTree), [activeSessionTree])
   const completedLive = useMemo(
@@ -174,7 +183,7 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
     return () => {
       cancelled = true
     }
-  }, [parentSessionId, requestGateway])
+  }, [hydrateKey, parentSessionId, requestGateway])
 
   const openReplay = async (run: StudioAgentRun) => {
     setSelectedRun(run)
