@@ -689,10 +689,11 @@ export function ChatBar({
         onPickImages={onPickImages}
         state={state}
       />
-      <StudioTeamButton sessionId={sessionId} />
       <StudioGoalButton />
     </>
   )
+
+  const teamSelector = <StudioTeamButton className="ml-3" sessionId={sessionId} />
 
   const controls = (
     <ComposerControls
@@ -979,6 +980,7 @@ export function ChatBar({
                   </div>
                 )}
                 {attachments.length > 0 && <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />}
+                {teamSelector}
                 <div
                   className={cn(
                     'grid w-full',
