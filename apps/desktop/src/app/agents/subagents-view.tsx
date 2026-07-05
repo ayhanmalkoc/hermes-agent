@@ -21,7 +21,7 @@ import {
 import type { GatewayRequester } from '@/lib/yolo-session'
 import type { SessionMessage } from '@/types/hermes'
 
-import { Panel, PanelEmpty, PanelHeader } from '../overlays/panel'
+import { Panel, PanelHeader } from '../overlays/panel'
 
 // Mirrors statusGlyph() in tool-fallback.tsx so subagent rows speak the
 // same visual vocabulary as the chat tool blocks.
@@ -76,7 +76,8 @@ function streamGlyph(entry: SubagentStreamEntry): ReactNode {
 
 interface SubagentsViewProps {
   onClose: () => void
-  parentSessionId: null | string
+  runtimeSessionId: null | string
+  storedSessionId: null | string
   requestGateway: GatewayRequester
 }
 
@@ -123,7 +124,22 @@ function messageText(message: SessionMessage): string {
   return typeof message.text === 'string' ? message.text : ''
 }
 
-export function SubagentsView({ onClose, parentSessionId, requestGateway }: SubagentsViewProps) {
+function mergeRuns(lists: StudioAgentRun[][]): StudioAgentRun[] {
+  const seen = new Set<string>()
+  const merged: StudioAgentRun[] = []
+
+  for (const runs of lists) {
+    for (const run of runs) {
+      if (!run.id || seen.has(run.id)) continue
+      seen.add(run.id)
+      merged.push(run)
+    }
+  }
+
+  return merged.sort((a, b) => (b.updated_at ?? b.started_at ?? 0) - (a.updated_at ?? a.started_at ?? 0))
+}
+
+export function SubagentsView({ onClose, runtimeSessionId, storedSessionId, requestGateway }: SubagentsViewProps) {
   const { t } = useI18n()
   const subagentsBySession = useStore($subagentsBySession)
   const [runs, setRuns] = useState<StudioAgentRun[]>([])
@@ -132,15 +148,20 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
   const [replayMessages, setReplayMessages] = useState<SessionMessage[]>([])
   const [loadingReplay, setLoadingReplay] = useState(false)
 
-  const activeSessionItems = parentSessionId ? (subagentsBySession[parentSessionId] ?? []) : []
+  const activeSessionItems = runtimeSessionId ? (subagentsBySession[runtimeSessionId] ?? []) : []
+  const hydrateSessionIds = useMemo(
+    () => [...new Set([storedSessionId, runtimeSessionId].map(id => id?.trim()).filter((id): id is string => Boolean(id)))],
+    [runtimeSessionId, storedSessionId]
+  )
   const hydrateKey = useMemo(
     () =>
       [
-        parentSessionId ?? '',
+        hydrateSessionIds.join(','),
+        runtimeSessionId ?? '',
         activeSessionItems.length,
         ...activeSessionItems.map(item => `${item.id}:${item.status}:${item.updatedAt}`)
       ].join('|'),
-    [activeSessionItems, parentSessionId]
+    [activeSessionItems, hydrateSessionIds, runtimeSessionId]
   )
   const activeSessionTree = useMemo(() => buildSubagentTree(activeSessionItems), [activeSessionItems])
   const activeSessionFlat = useMemo(() => flatten(activeSessionTree), [activeSessionTree])
@@ -159,7 +180,7 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
   )
 
   useEffect(() => {
-    if (!parentSessionId) {
+    if (!hydrateSessionIds.length) {
       setRuns([])
       setRunsLoading(false)
       return
@@ -168,15 +189,16 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
     let cancelled = false
     setRunsLoading(true)
 
-    requestGateway<{ runs?: StudioAgentRun[] }>('studio.agent_runs', { parent_session_id: parentSessionId })
-      .then(result => {
+    Promise.all(
+      hydrateSessionIds.map(sessionId =>
+        requestGateway<{ runs?: StudioAgentRun[] }>('studio.agent_runs', { parent_session_id: sessionId })
+          .then(result => (Array.isArray(result.runs) ? result.runs : []))
+          .catch(() => [])
+      )
+    )
+      .then(results => {
         if (!cancelled) {
-          setRuns(Array.isArray(result.runs) ? result.runs : [])
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setRuns([])
+          setRuns(mergeRuns(results))
         }
       })
       .finally(() => {
@@ -188,7 +210,7 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
     return () => {
       cancelled = true
     }
-  }, [hydrateKey, parentSessionId, requestGateway])
+  }, [hydrateKey, hydrateSessionIds, requestGateway])
 
   const openReplay = async (run: StudioAgentRun) => {
     setSelectedRun(run)
@@ -250,38 +272,32 @@ export function SubagentsView({ onClose, parentSessionId, requestGateway }: Suba
 
   return (
     <Panel closeLabel={t.agents.close} onClose={onClose}>
-      {runningTree.length === 0 && completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
-        <PanelEmpty description={t.agents.emptyDesc} icon="hubot" title={t.agents.emptyTitle} />
-      ) : (
-        <>
-          <PanelHeader subtitle={t.agents.subtitle} title={t.agents.title} />
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden">
-            <section className="min-h-0 min-w-0">
-              <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Running</p>
-              {runningTree.length > 0 ? <SubagentTree tree={runningTree} /> : <p className="text-xs text-muted-foreground/65">No running agents.</p>}
-            </section>
-            <section className="min-h-0 min-w-0 flex-1 overflow-hidden">
-              <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Completed</p>
-              <div className="min-h-0 overflow-y-auto pr-1">
-                <div className="grid gap-3">
-                  {completedLive.map(node => (
-                    <CompletedNodeRow key={node.id} node={node} nowMs={Date.now()} onOpen={openReplay} />
-                  ))}
-                  {completedRuns.map(run => (
-                    <CompletedRunRow key={run.id} onOpen={openReplay} run={run} />
-                  ))}
-                  {runsLoading && completedLive.length === 0 && completedRuns.length === 0 ? (
-                    <p className="text-xs text-muted-foreground/65">Loading completed runs…</p>
-                  ) : null}
-                  {completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
-                    <p className="text-xs text-muted-foreground/65">No completed runs for this session.</p>
-                  ) : null}
-                </div>
-              </div>
-            </section>
+      <PanelHeader subtitle={t.agents.subtitle} title={t.agents.title} />
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden">
+        <section className="min-h-0 min-w-0">
+          <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Running</p>
+          {runningTree.length > 0 ? <SubagentTree tree={runningTree} /> : <p className="text-xs text-muted-foreground/65">No running agents.</p>}
+        </section>
+        <section className="min-h-0 min-w-0 flex-1 overflow-hidden">
+          <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Completed</p>
+          <div className="min-h-0 overflow-y-auto pr-1">
+            <div className="grid gap-3">
+              {completedLive.map(node => (
+                <CompletedNodeRow key={node.id} node={node} nowMs={Date.now()} onOpen={openReplay} />
+              ))}
+              {completedRuns.map(run => (
+                <CompletedRunRow key={run.id} onOpen={openReplay} run={run} />
+              ))}
+              {runsLoading && completedLive.length === 0 && completedRuns.length === 0 ? (
+                <p className="text-xs text-muted-foreground/65">Loading completed runs…</p>
+              ) : null}
+              {completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
+                <p className="text-xs text-muted-foreground/65">No completed runs for this session.</p>
+              ) : null}
+            </div>
           </div>
-        </>
-      )}
+        </section>
+      </div>
     </Panel>
   )
 }
