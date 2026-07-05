@@ -273,28 +273,26 @@ export function SubagentsView({ onClose, runtimeSessionId, storedSessionId, requ
   return (
     <Panel closeLabel={t.agents.close} onClose={onClose}>
       <PanelHeader subtitle={t.agents.subtitle} title={t.agents.title} />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden">
-        <section className="min-h-0 min-w-0">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain pr-1">
+        <section className="min-w-0 shrink-0">
           <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Running</p>
           {runningTree.length > 0 ? <SubagentTree tree={runningTree} /> : <p className="text-xs text-muted-foreground/65">No running agents.</p>}
         </section>
-        <section className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        <section className="min-w-0 shrink-0">
           <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Completed</p>
-          <div className="min-h-0 overflow-y-auto pr-1">
-            <div className="grid gap-3">
-              {completedLive.map(node => (
-                <CompletedNodeRow key={node.id} node={node} nowMs={Date.now()} onOpen={openReplay} />
-              ))}
-              {completedRuns.map(run => (
-                <CompletedRunRow key={run.id} onOpen={openReplay} run={run} />
-              ))}
-              {runsLoading && completedLive.length === 0 && completedRuns.length === 0 ? (
-                <p className="text-xs text-muted-foreground/65">Loading completed runs…</p>
-              ) : null}
-              {completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
-                <p className="text-xs text-muted-foreground/65">No completed runs for this session.</p>
-              ) : null}
-            </div>
+          <div className="grid gap-3">
+            {completedLive.map(node => (
+              <CompletedNodeRow key={node.id} node={node} nowMs={Date.now()} onOpen={openReplay} />
+            ))}
+            {completedRuns.map(run => (
+              <CompletedRunRow key={run.id} onOpen={openReplay} run={run} />
+            ))}
+            {runsLoading && completedLive.length === 0 && completedRuns.length === 0 ? (
+              <p className="text-xs text-muted-foreground/65">Loading completed runs…</p>
+            ) : null}
+            {completedLive.length === 0 && completedRuns.length === 0 && !runsLoading ? (
+              <p className="text-xs text-muted-foreground/65">No completed runs for this session.</p>
+            ) : null}
           </div>
         </section>
       </div>
