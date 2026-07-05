@@ -10,6 +10,8 @@ import { type Translations, useI18n } from '@/i18n'
 import { AlertCircle, CheckCircle2 } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
+import { getSessionMessages } from '@/hermes'
+import { $activeSessionId } from '@/store/session'
 import {
   $subagentsBySession,
   allSubagents,
@@ -18,6 +20,8 @@ import {
   type SubagentStatus,
   type SubagentStreamEntry
 } from '@/store/subagents'
+import type { GatewayRequester } from '@/lib/yolo-session'
+import type { SessionMessage } from '@/types/hermes'
 
 import { Panel, PanelEmpty, PanelHeader } from '../overlays/panel'
 
@@ -74,25 +78,192 @@ function streamGlyph(entry: SubagentStreamEntry): ReactNode {
 
 interface SubagentsViewProps {
   onClose: () => void
+  requestGateway: GatewayRequester
 }
 
-export function SubagentsView({ onClose }: SubagentsViewProps) {
+interface StudioAgentRun {
+  id: string
+  title?: string
+  started_at?: number
+  updated_at?: number
+  model?: string
+  profile_id?: string
+  profile_name?: string
+  summary?: string
+  message_count?: number
+}
+
+const isRunningStatus = (status: SubagentStatus) => status === 'running' || status === 'queued'
+
+function messageText(message: SessionMessage): string {
+  const content = message.content
+
+  if (typeof content === 'string') {
+    return content
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map(part => {
+        if (typeof part === 'string') {
+          return part
+        }
+
+        if (part && typeof part === 'object') {
+          const record = part as Record<string, unknown>
+
+          return String(record.text ?? record.content ?? '')
+        }
+
+        return ''
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  return typeof message.text === 'string' ? message.text : ''
+}
+
+export function SubagentsView({ onClose, requestGateway }: SubagentsViewProps) {
   const { t } = useI18n()
   const subagentsBySession = useStore($subagentsBySession)
+  const activeSessionId = useStore($activeSessionId)
+  const [runs, setRuns] = useState<StudioAgentRun[]>([])
+  const [selectedRun, setSelectedRun] = useState<StudioAgentRun | null>(null)
+  const [replayMessages, setReplayMessages] = useState<SessionMessage[]>([])
+  const [loadingReplay, setLoadingReplay] = useState(false)
 
   // Aggregate every session, matching the status-bar indicator — a subagent
   // running in a background session must still be visible here, or the two
   // desync ("Agents N running" vs an empty tree).
   const tree = useMemo(() => buildSubagentTree(allSubagents(subagentsBySession)), [subagentsBySession])
+  const flat = useMemo(() => flatten(tree), [tree])
+  const runningTree = useMemo(() => buildSubagentTree(flat.filter(node => isRunningStatus(node.status))), [flat])
+  const activeSessionItems = activeSessionId ? (subagentsBySession[activeSessionId] ?? []) : []
+  const activeSessionTree = useMemo(() => buildSubagentTree(activeSessionItems), [activeSessionItems])
+  const activeSessionFlat = useMemo(() => flatten(activeSessionTree), [activeSessionTree])
+  const completedLive = useMemo(
+    () => activeSessionFlat.filter(node => !isRunningStatus(node.status) && node.sessionId),
+    [activeSessionFlat]
+  )
+  const completedIds = useMemo(() => new Set(completedLive.map(node => node.sessionId).filter(Boolean)), [completedLive])
+  const completedRuns = useMemo(
+    () => runs.filter(run => !completedIds.has(run.id)),
+    [completedIds, runs]
+  )
+
+  useEffect(() => {
+    if (!activeSessionId) {
+      setRuns([])
+      return
+    }
+
+    let cancelled = false
+
+    requestGateway<{ runs?: StudioAgentRun[] }>('studio.agent_runs', { parent_session_id: activeSessionId })
+      .then(result => {
+        if (!cancelled) {
+          setRuns(Array.isArray(result.runs) ? result.runs : [])
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRuns([])
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeSessionId, requestGateway])
+
+  const openReplay = async (run: StudioAgentRun) => {
+    setSelectedRun(run)
+    setReplayMessages([])
+    setLoadingReplay(true)
+
+    try {
+      const result = await getSessionMessages(run.id)
+      setReplayMessages(result.messages ?? [])
+    } catch {
+      setReplayMessages([])
+    } finally {
+      setLoadingReplay(false)
+    }
+  }
+
+  if (selectedRun) {
+    return (
+      <Panel closeLabel={t.agents.close} onClose={onClose}>
+        <PanelHeader subtitle={selectedRun.id} title={selectedRun.profile_name || selectedRun.profile_id || 'Agent Run'} />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-hidden">
+          <button
+            className="w-fit rounded-md border border-border/60 px-2 py-1 text-[0.68rem] font-medium text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+            onClick={() => setSelectedRun(null)}
+            type="button"
+          >
+            ← Live Agents
+          </button>
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1" data-selectable-text="true">
+            {loadingReplay ? (
+              <p className="text-sm text-muted-foreground">Loading run…</p>
+            ) : replayMessages.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No transcript found.</p>
+            ) : (
+              <div className="grid gap-3">
+                {replayMessages.map((message, index) => {
+                  const text = messageText(message)
+
+                  if (!text) {
+                    return null
+                  }
+
+                  return (
+                    <article className="rounded-xl border border-border/55 bg-muted/20 p-3" key={`${message.role}:${index}`}>
+                      <p className="mb-1 text-[0.62rem] font-medium uppercase tracking-wider text-muted-foreground/65">
+                        {message.role}
+                      </p>
+                      <p className="whitespace-pre-wrap text-[0.78rem] leading-relaxed text-foreground/85">{text}</p>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Panel>
+    )
+  }
 
   return (
     <Panel closeLabel={t.agents.close} onClose={onClose}>
-      {tree.length === 0 ? (
+      {runningTree.length === 0 && completedLive.length === 0 && completedRuns.length === 0 ? (
         <PanelEmpty description={t.agents.emptyDesc} icon="hubot" title={t.agents.emptyTitle} />
       ) : (
         <>
           <PanelHeader subtitle={t.agents.subtitle} title={t.agents.title} />
-          <SubagentTree tree={tree} />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden">
+            <section className="min-h-0 min-w-0">
+              <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Running</p>
+              {runningTree.length > 0 ? <SubagentTree tree={runningTree} /> : <p className="text-xs text-muted-foreground/65">No running agents.</p>}
+            </section>
+            <section className="min-h-0 min-w-0 flex-1 overflow-hidden">
+              <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Completed</p>
+              <div className="min-h-0 overflow-y-auto pr-1">
+                <div className="grid gap-3">
+                  {completedLive.map(node => (
+                    <CompletedNodeRow key={node.id} node={node} nowMs={Date.now()} onOpen={openReplay} />
+                  ))}
+                  {completedRuns.map(run => (
+                    <CompletedRunRow key={run.id} onOpen={openReplay} run={run} />
+                  ))}
+                  {completedLive.length === 0 && completedRuns.length === 0 ? (
+                    <p className="text-xs text-muted-foreground/65">No completed runs for this session.</p>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+          </div>
         </>
       )}
     </Panel>
@@ -294,6 +465,74 @@ function StreamLine({
         ) : null}
       </span>
     </div>
+  )
+}
+
+function CompletedRunRow({ onOpen, run }: { onOpen: (run: StudioAgentRun) => void; run: StudioAgentRun }) {
+  const title = run.profile_name || run.profile_id || run.title || 'Agent Run'
+  const subtitle = [run.profile_id, run.model, run.message_count ? `${run.message_count} messages` : '', run.id].filter(Boolean)
+
+  return (
+    <button
+      className="group grid min-w-0 gap-1 rounded-xl border border-border/60 bg-muted/15 p-3 text-left transition-colors hover:border-border hover:bg-muted/35"
+      onClick={() => onOpen(run)}
+      type="button"
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <CheckCircle2 aria-hidden className="size-3.5 shrink-0 text-emerald-600/85 dark:text-emerald-400/85" />
+        <span className="truncate text-[0.82rem] font-medium text-foreground/90 group-hover:text-foreground">{title}</span>
+      </span>
+      {subtitle.length > 0 ? <span className="truncate text-[0.66rem] text-muted-foreground/65">{subtitle.join(' · ')}</span> : null}
+      {run.summary ? <span className="line-clamp-2 text-[0.72rem] leading-relaxed text-muted-foreground/75">{run.summary}</span> : null}
+    </button>
+  )
+}
+
+function CompletedNodeRow({
+  node,
+  nowMs,
+  onOpen
+}: {
+  node: SubagentNode
+  nowMs: number
+  onOpen: (run: StudioAgentRun) => void
+}) {
+  const { t } = useI18n()
+  const run: StudioAgentRun = {
+    id: node.sessionId || node.id,
+    model: node.model,
+    profile_id: node.profileId,
+    profile_name: node.profileName,
+    summary: node.summary || node.stream.at(-1)?.text || node.goal,
+    updated_at: node.updatedAt,
+    message_count: node.stream.length
+  }
+  const subtitle = [
+    node.profileId,
+    node.model,
+    fmtDuration(node.durationSeconds, t.agents),
+    node.sessionId,
+    t.agents.updatedAgo(fmtAge(node.updatedAt, nowMs, t.agents))
+  ].filter(Boolean)
+
+  return (
+    <button
+      className="group grid min-w-0 gap-1 rounded-xl border border-border/60 bg-muted/15 p-3 text-left transition-colors hover:border-border hover:bg-muted/35"
+      disabled={!node.sessionId}
+      onClick={() => node.sessionId && onOpen(run)}
+      type="button"
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        {statusGlyph(node.status, t.agents)}
+        <span className="truncate text-[0.82rem] font-medium text-foreground/90 group-hover:text-foreground">
+          {node.profileName || node.profileId || node.goal}
+        </span>
+      </span>
+      {subtitle.length > 0 ? <span className="truncate text-[0.66rem] text-muted-foreground/65">{subtitle.join(' · ')}</span> : null}
+      <span className="line-clamp-2 text-[0.72rem] leading-relaxed text-muted-foreground/75">
+        {node.summary || node.stream.at(-1)?.text || node.goal}
+      </span>
+    </button>
   )
 }
 

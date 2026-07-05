@@ -218,6 +218,7 @@ _LONG_HANDLERS = frozenset(
         "session.compress",
         "session.list",
         "session.resume",
+        "studio.agent_runs",
         "shell.exec",
         "skills.manage",
         "slash.exec",
@@ -5072,6 +5073,77 @@ def _(rid, params: dict) -> dict:
             },
         )
     except Exception as e:
+        return _err(rid, 5006, str(e))
+
+
+@method("studio.agent_runs")
+def _(rid, params: dict) -> dict:
+    parent_session_id = str(params.get("parent_session_id") or "").strip()
+    if not parent_session_id:
+        return _err(rid, 4006, "parent_session_id required")
+
+    db = _get_db()
+    if db is None:
+        return _db_unavailable_error(rid, code=5006)
+
+    try:
+        with db._lock:
+            rows = db._conn.execute(
+                """
+                SELECT id, title, started_at, updated_at, model, model_config
+                FROM sessions
+                WHERE json_extract(COALESCE(model_config, '{}'), '$._studio_agent_run') = 1
+                  AND json_extract(COALESCE(model_config, '{}'), '$._studio_parent_session_id') = ?
+                ORDER BY COALESCE(updated_at, started_at, 0) DESC
+                LIMIT 100
+                """,
+                (parent_session_id,),
+            ).fetchall()
+
+        runs = []
+        for row in rows:
+            raw_config = row["model_config"] or "{}"
+            try:
+                model_config = json.loads(raw_config) if isinstance(raw_config, str) else dict(raw_config)
+            except Exception:
+                model_config = {}
+
+            messages = db.get_messages(row["id"])
+            last_assistant = ""
+            for msg in reversed(messages):
+                if msg.get("role") != "assistant":
+                    continue
+                content = msg.get("content")
+                if isinstance(content, str):
+                    last_assistant = content.strip()
+                elif isinstance(content, list):
+                    parts = []
+                    for part in content:
+                        if isinstance(part, dict):
+                            parts.append(str(part.get("text") or part.get("content") or ""))
+                        else:
+                            parts.append(str(part))
+                    last_assistant = "\n".join(p for p in parts if p).strip()
+                break
+
+            runs.append(
+                {
+                    "id": row["id"],
+                    "title": row["title"] or "",
+                    "started_at": row["started_at"] or 0,
+                    "updated_at": row["updated_at"] or row["started_at"] or 0,
+                    "model": row["model"] or model_config.get("model") or "",
+                    "profile_id": model_config.get("_studio_profile_id") or "",
+                    "profile_name": model_config.get("_studio_profile_name") or model_config.get("_studio_profile_id") or "",
+                    "team_id": model_config.get("_studio_team_id") or "",
+                    "summary": last_assistant[:2000],
+                    "message_count": len(messages),
+                }
+            )
+
+        return _ok(rid, {"runs": runs})
+    except Exception as e:
+        logger.exception("studio.agent_runs failed")
         return _err(rid, 5006, str(e))
 
 

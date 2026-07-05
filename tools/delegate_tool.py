@@ -1168,7 +1168,7 @@ def _build_child_agent(
 
     delegation_cfg = _load_config()
     target_profile_id = _normalize_profile_id(target_profile_id)
-    target_profile_name = str(target_profile_name or target_profile_id or "").strip() or None
+    target_profile_name = str(target_profile_id or target_profile_name or "").strip() or None
     profile_bound = bool(target_profile_id)
 
     # When no explicit toolsets given, inherit from parent's enabled toolsets
