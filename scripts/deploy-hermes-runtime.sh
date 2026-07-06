@@ -7,10 +7,13 @@ RUNTIME_USER="${RUNTIME_USER:-hermes}"
 RUNTIME_GROUP="${RUNTIME_GROUP:-hermes}"
 PYTHON_BIN="$RUNTIME_VENV/bin/python"
 RUNTIME_EXTRA_PACKAGES="${RUNTIME_EXTRA_PACKAGES:-aiohttp}"
+TAILNET_IP="${TAILNET_IP:-100.107.234.45}"
+GATEWAY_PORT="${GATEWAY_PORT:-8642}"
+DASHBOARD_PORT="${DASHBOARD_PORT:-9119}"
 SERVICES=(hermes-gateway.service hermes-dashboard.service)
 SMOKE_URLS=(
-  "http://100.107.234.45:9119/"
-  "http://100.107.234.45:8642/health"
+  "http://$TAILNET_IP:$DASHBOARD_PORT/"
+  "http://$TAILNET_IP:$GATEWAY_PORT/health"
 )
 
 log() { printf '\n==> %s\n' "$*"; }
@@ -29,6 +32,9 @@ Environment overrides:
   REPO_ROOT=/root/hermes-agent
   RUNTIME_VENV=/opt/hermes-runtime/.venv
   RUNTIME_USER=hermes
+  TAILNET_IP=100.107.234.45
+  GATEWAY_PORT=8642
+  DASHBOARD_PORT=9119
   RUNTIME_EXTRA_PACKAGES="aiohttp"
 EOF
 }
@@ -107,8 +113,8 @@ runuser -u "$RUNTIME_USER" -- "$PYTHON_BIN" - <<'PY'
 import urllib.request
 
 urls = [
-    ("http://100.107.234.45:9119/", {200, 302, 401}),
-    ("http://100.107.234.45:8642/health", {200}),
+    ("${SMOKE_URLS[0]}", {200, 302, 401}),
+    ("${SMOKE_URLS[1]}", {200}),
 ]
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
