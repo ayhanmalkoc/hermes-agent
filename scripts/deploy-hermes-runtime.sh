@@ -109,12 +109,14 @@ log "service status"
 systemctl is-active "${SERVICES[@]}"
 
 log "http smoke"
+SMOKE_DASHBOARD_URL="${SMOKE_URLS[0]}" SMOKE_GATEWAY_URL="${SMOKE_URLS[1]}" \
 runuser -u "$RUNTIME_USER" -- "$PYTHON_BIN" - <<'PY'
+import os
 import urllib.request
 
 urls = [
-    ("${SMOKE_URLS[0]}", {200, 302, 401}),
-    ("${SMOKE_URLS[1]}", {200}),
+    (os.environ["SMOKE_DASHBOARD_URL"], {200, 302, 401}),
+    (os.environ["SMOKE_GATEWAY_URL"], {200}),
 ]
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
