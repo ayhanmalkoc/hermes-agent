@@ -15,6 +15,13 @@ DASHBOARD_PORT="${DASHBOARD_PORT:-9119}"
 PYTHON_BIN="$RUNTIME_VENV/bin/python"
 HERMES_BIN="$RUNTIME_VENV/bin/hermes"
 UV_BIN="${UV_BIN:-$(command -v uv || true)}"
+NODE_BIN_DIR="${NODE_BIN_DIR:-}"
+if [[ -z "$NODE_BIN_DIR" ]]; then
+  NODE_BIN_DIR="$(find /root/.nvm/versions/node -maxdepth 1 -type d -name 'v22*' 2>/dev/null | sort -V | tail -n 1)/bin"
+fi
+if [[ ! -x "$NODE_BIN_DIR/node" ]]; then
+  NODE_BIN_DIR="$(dirname "$(command -v node || echo /usr/bin/node)")"
+fi
 SERVICES=(hermes-gateway.service hermes-dashboard.service)
 SMOKE_URLS=(
   "http://$TAILNET_IP:$DASHBOARD_PORT/"
@@ -43,6 +50,7 @@ Environment overrides:
   TAILNET_IP=100.107.234.45
   GATEWAY_PORT=8642
   DASHBOARD_PORT=9119
+  NODE_BIN_DIR=/root/.nvm/versions/node/v22.x.x/bin
 USAGE
 }
 
@@ -163,8 +171,8 @@ else
 fi
 
 log "build dashboard web assets"
-npm install --workspace web
-npm run build -w web
+PATH="$NODE_BIN_DIR:$PATH" npm install --workspace web
+PATH="$NODE_BIN_DIR:$PATH" npm run build -w web
 
 log "permission guard"
 permission_guard
