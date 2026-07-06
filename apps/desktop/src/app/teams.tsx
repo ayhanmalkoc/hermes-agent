@@ -89,7 +89,7 @@ function ProfileMemberChip({
     <button
       aria-pressed={selected}
       className={cn(
-        'inline-flex max-w-full items-center gap-2 rounded-full border px-2.5 py-1.5 text-sm transition-colors',
+        'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[0.78rem] transition-colors',
         selected
           ? 'border-primary/45 bg-primary/12 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]'
           : 'border-border/65 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/35 hover:text-foreground'
@@ -99,13 +99,13 @@ function ProfileMemberChip({
     >
       <span
         aria-hidden="true"
-        className="grid size-5 shrink-0 place-items-center rounded-full text-[0.58rem] font-semibold uppercase leading-none"
+        className="grid size-4 shrink-0 place-items-center rounded-full text-[0.5rem] font-semibold uppercase leading-none"
         style={{ backgroundColor: profileColorSoft(hue, selected ? 30 : 22), color: color ?? undefined }}
       >
         {initial}
       </span>
       <span className="min-w-0 truncate font-medium">{profile.name}</span>
-      {selected ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
+      {selected ? <Check className="size-3 shrink-0 text-primary" /> : null}
     </button>
   )
 }
@@ -260,8 +260,8 @@ export function TeamsView({ onClose }: TeamsViewProps) {
               title={team.name}
             />
           ))}
-          <PanelAddButton label="New team" onClick={createNew} />
-          <PanelAddButton icon="sparkle" label="From preset" onClick={() => setPresetGalleryOpen(true)} />
+          <PanelAddButton label="New team" onClick={createNew} showLabel />
+          <PanelAddButton icon="sparkle" label="From preset" onClick={() => setPresetGalleryOpen(true)} showLabel />
         </PanelList>
 
         {selected || selectedId === null ? (

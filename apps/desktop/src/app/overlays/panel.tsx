@@ -330,22 +330,28 @@ export function PanelPill({ children, tone = 'muted' }: { children: ReactNode; t
 export function PanelAddButton({
   icon = 'add',
   label,
-  onClick
+  onClick,
+  showLabel = false
 }: {
   icon?: string
   label: string
   onClick: () => void
+  showLabel?: boolean
 }) {
   return (
     <Button
       aria-label={label}
-      className="h-7 w-full shrink-0 justify-center text-muted-foreground/70 hover:bg-(--ui-row-hover-background) hover:text-foreground"
+      className={cn(
+        'h-7 w-full shrink-0 text-muted-foreground/70 hover:bg-(--ui-row-hover-background) hover:text-foreground',
+        showLabel ? 'justify-start gap-2 px-2 text-[0.78rem]' : 'justify-center'
+      )}
       onClick={onClick}
       size="sm"
       title={label}
       variant="ghost"
     >
       <Codicon name={icon} size="0.875rem" />
+      {showLabel ? <span className="truncate font-medium">{label}</span> : null}
     </Button>
   )
 }

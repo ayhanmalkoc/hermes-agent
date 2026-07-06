@@ -250,8 +250,8 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
                   profile={profile}
                 />
               ))}
-              <PanelAddButton label={p.newProfile} onClick={() => setCreateOpen(true)} />
-              <PanelAddButton icon="sparkle" label="From preset" onClick={() => setPresetGalleryOpen(true)} />
+              <PanelAddButton label={p.newProfile} onClick={() => setCreateOpen(true)} showLabel />
+              <PanelAddButton icon="sparkle" label="From preset" onClick={() => setPresetGalleryOpen(true)} showLabel />
             </PanelList>
 
             {presetImportStatus ? <p className="px-1 text-xs text-muted-foreground">{presetImportStatus}</p> : null}
@@ -468,7 +468,7 @@ function ProfileTeamLinks({ profileName }: { profileName: string }) {
               <button
                 aria-pressed={selected}
                 className={cn(
-                  'inline-flex max-w-full items-center gap-2 rounded-full border px-2.5 py-1.5 text-sm transition-colors',
+                  'inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-[0.78rem] transition-colors',
                   selected
                     ? 'border-primary/45 bg-primary/12 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]'
                     : 'border-border/65 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/35 hover:text-foreground'
@@ -477,9 +477,9 @@ function ProfileTeamLinks({ profileName }: { profileName: string }) {
                 onClick={() => toggleTeam(team.id, !selected)}
                 type="button"
               >
-                <Codicon className="shrink-0" name="organization" size="0.8rem" />
+                <Codicon className="shrink-0" name="organization" size="0.75rem" />
                 <span className="min-w-0 truncate font-medium">{team.name}</span>
-                {selected ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
+                {selected ? <Check className="size-3 shrink-0 text-primary" /> : null}
               </button>
             )
           })}
