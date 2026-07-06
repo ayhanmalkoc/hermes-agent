@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react'
 import { useEffect, useMemo, useState } from 'react'
 
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Codicon } from '@/components/ui/codicon'
 import {
   Dialog,
@@ -14,10 +13,12 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Save } from '@/lib/icons'
+import { Check, Save } from '@/lib/icons'
+import { profileColorSoft, resolveProfileColor } from '@/lib/profile-color'
+import { cn } from '@/lib/utils'
 import { getProfiles } from '@/hermes'
 import { notifyError } from '@/store/notifications'
-import { refreshActiveProfile } from '@/store/profile'
+import { $profileColors, refreshActiveProfile } from '@/store/profile'
 import {
   $studioTeams,
   createStudioTeam,
@@ -28,8 +29,7 @@ import {
 import {
   BUILTIN_STUDIO_TEAM_PRESETS,
   createStudioTeamFromPreset,
-  getStudioTeamPresetAgents,
-  getStudioTeamPresetForTeam
+  getStudioTeamPresetAgents
 } from '@/store/studio-team-presets'
 import type { ProfileInfo } from '@/types/hermes'
 
@@ -67,6 +67,49 @@ function draftFromTeam(team: StudioTeam | null): TeamDraft {
   }
 }
 
+function ProfileMemberChip({
+  onToggle,
+  profile,
+  selected
+}: {
+  onToggle: (selected: boolean) => void
+  profile: ProfileInfo
+  selected: boolean
+}) {
+  const colors = useStore($profileColors)
+  const color = resolveProfileColor(profile.name, colors)
+  const hue = color ?? 'var(--ui-text-quaternary)'
+  const initial =
+    profile.name
+      .replace(/[^a-z0-9]/gi, '')
+      .charAt(0)
+      .toUpperCase() || '?'
+
+  return (
+    <button
+      aria-pressed={selected}
+      className={cn(
+        'inline-flex max-w-full items-center gap-2 rounded-full border px-2.5 py-1.5 text-sm transition-colors',
+        selected
+          ? 'border-primary/45 bg-primary/12 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]'
+          : 'border-border/65 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/35 hover:text-foreground'
+      )}
+      onClick={() => onToggle(!selected)}
+      type="button"
+    >
+      <span
+        aria-hidden="true"
+        className="grid size-5 shrink-0 place-items-center rounded-full text-[0.58rem] font-semibold uppercase leading-none"
+        style={{ backgroundColor: profileColorSoft(hue, selected ? 30 : 22), color: color ?? undefined }}
+      >
+        {initial}
+      </span>
+      <span className="min-w-0 truncate font-medium">{profile.name}</span>
+      {selected ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
+    </button>
+  )
+}
+
 export function TeamsView({ onClose }: TeamsViewProps) {
   const teams = useStore($studioTeams)
   const [profiles, setProfiles] = useState<ProfileInfo[]>([])
@@ -102,11 +145,6 @@ export function TeamsView({ onClose }: TeamsViewProps) {
   }, [selectedId, teams])
 
   const existingProfileNames = useMemo(() => new Set(profiles.map(profile => profile.name)), [profiles])
-  const selectedPreset = getStudioTeamPresetForTeam(selected)
-  const presetMembersByProfile = useMemo(
-    () => new Map((selectedPreset ? getStudioTeamPresetAgents(selectedPreset) : []).map(agent => [agent.profileId, agent])),
-    [selectedPreset]
-  )
   const visibleTeams = useMemo(() => {
     const needle = query.trim().toLowerCase()
 
@@ -236,10 +274,6 @@ export function TeamsView({ onClose }: TeamsViewProps) {
                   </PanelSectionLabel>
                   {dirty ? <p className="text-xs text-muted-foreground">Unsaved changes</p> : null}
                 </div>
-                <Button disabled={!canSave} onClick={save} size="sm">
-                  <Save />
-                  Save
-                </Button>
               </div>
               <Input
                 aria-label="Team name"
@@ -259,20 +293,14 @@ export function TeamsView({ onClose }: TeamsViewProps) {
 
             <section className="space-y-2">
               <PanelSectionLabel>Members</PanelSectionLabel>
-              <div className="grid gap-2">
+              <div className="flex flex-wrap gap-2">
                 {profiles.map(profile => (
-                  <label className="flex items-center gap-2 text-sm" key={profile.name}>
-                    <Checkbox
-                      checked={draft.profileIds.includes(profile.name)}
-                      onCheckedChange={checked => toggleProfile(profile.name, checked === true)}
-                    />
-                    <span>{presetMembersByProfile.get(profile.name)?.name ?? profile.name}</span>
-                    {presetMembersByProfile.has(profile.name) ? <PanelPill tone="muted">{profile.name}</PanelPill> : null}
-                    {profile.is_default && <PanelPill tone="good">default</PanelPill>}
-                    {presetMembersByProfile.get(profile.name)?.description ? (
-                      <span className="text-xs text-muted-foreground">{presetMembersByProfile.get(profile.name)?.description}</span>
-                    ) : null}
-                  </label>
+                  <ProfileMemberChip
+                    key={profile.name}
+                    onToggle={selected => toggleProfile(profile.name, selected)}
+                    profile={profile}
+                    selected={draft.profileIds.includes(profile.name)}
+                  />
                 ))}
               </div>
             </section>
@@ -285,6 +313,12 @@ export function TeamsView({ onClose }: TeamsViewProps) {
                 placeholder="Tell the active profile how to use this team."
                 value={draft.instructions}
               />
+              <div className="flex justify-end">
+                <Button disabled={!canSave} onClick={save} size="sm">
+                  <Save />
+                  Save
+                </Button>
+              </div>
             </section>
           </PanelDetail>
         ) : (

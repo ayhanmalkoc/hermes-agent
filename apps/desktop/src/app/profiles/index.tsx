@@ -26,7 +26,7 @@ import {
   updateProfileSoul
 } from '@/hermes'
 import { useI18n } from '@/i18n'
-import { AlertTriangle, Save } from '@/lib/icons'
+import { AlertTriangle, Check, Save } from '@/lib/icons'
 import { profileColorSoft, resolveProfileColor } from '@/lib/profile-color'
 import { slug } from '@/lib/sanitize'
 import { cn } from '@/lib/utils'
@@ -445,12 +445,12 @@ function ProfileDetail({ profile, showTeamLinks = false }: { profile: ProfileInf
 function ProfileTeamLinks({ profileName }: { profileName: string }) {
   const teams = useStore($studioTeams)
 
-  const toggleTeam = (teamId: string, checked: boolean) => {
+  const toggleTeam = (teamId: string, selected: boolean) => {
     const team = teams.find(item => item.id === teamId)
 
     if (!team) return
     updateStudioTeam(team.id, {
-      profileIds: checked
+      profileIds: selected
         ? [...new Set([...team.profileIds, profileName])]
         : team.profileIds.filter(value => value !== profileName)
     })
@@ -460,18 +460,29 @@ function ProfileTeamLinks({ profileName }: { profileName: string }) {
     <section className="space-y-2">
       <PanelSectionLabel>Teams</PanelSectionLabel>
       {teams.length ? (
-        <div className="grid gap-2">
-          {teams.map(team => (
-            <label className="flex items-center gap-2 text-sm" key={team.id}>
-              <input
-                checked={team.profileIds.includes(profileName)}
-                className="size-4 accent-primary"
-                onChange={event => toggleTeam(team.id, event.target.checked)}
-                type="checkbox"
-              />
-              <span>{team.name}</span>
-            </label>
-          ))}
+        <div className="flex flex-wrap gap-2">
+          {teams.map(team => {
+            const selected = team.profileIds.includes(profileName)
+
+            return (
+              <button
+                aria-pressed={selected}
+                className={cn(
+                  'inline-flex max-w-full items-center gap-2 rounded-full border px-2.5 py-1.5 text-sm transition-colors',
+                  selected
+                    ? 'border-primary/45 bg-primary/12 text-foreground shadow-[inset_0_0_0_1px_hsl(var(--primary)/0.12)]'
+                    : 'border-border/65 bg-muted/20 text-muted-foreground hover:border-border hover:bg-muted/35 hover:text-foreground'
+                )}
+                key={team.id}
+                onClick={() => toggleTeam(team.id, !selected)}
+                type="button"
+              >
+                <Codicon className="shrink-0" name="organization" size="0.8rem" />
+                <span className="min-w-0 truncate font-medium">{team.name}</span>
+                {selected ? <Check className="size-3.5 shrink-0 text-primary" /> : null}
+              </button>
+            )
+          })}
         </div>
       ) : (
         <p className="text-sm text-muted-foreground/70">No teams yet. Create teams from the Teams view.</p>
