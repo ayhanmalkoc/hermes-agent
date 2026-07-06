@@ -8588,3 +8588,97 @@ def test_get_usage_clamps_post_compression_sentinel():
     usage = server._get_usage(agent)
     assert "context_used" not in usage
     assert "context_percent" not in usage
+
+
+def test_studio_team_set_persists_team_in_session_model_config(monkeypatch):
+    updates = {}
+
+    class FakeDb:
+        def get_session(self, session_id):
+            assert session_id == "session-a"
+            return {"model_config": json.dumps({"model": "gpt-test", "studio": {"other": True}})}
+
+        def update_session_meta(self, session_id, model_config, _title):
+            updates[session_id] = json.loads(model_config)
+
+    team = {
+        "id": "team-runtime",
+        "name": "Runtime Ops Team",
+        "description": "Inspect and deploy.",
+        "instructions": "Delegate by profile_id.",
+        "profileIds": ["inspector", "deployer", "inspector"],
+    }
+
+    monkeypatch.setattr(server, "_get_db", lambda: FakeDb())
+    server._sessions.pop("session-a", None)
+
+    result = server._methods["studio.team.set"]("r1", {"session_id": "session-a", "team": team})
+
+    assert result["result"]["team"]["profileIds"] == ["inspector", "deployer"]
+    assert updates["session-a"]["model"] == "gpt-test"
+    assert updates["session-a"]["studio"]["other"] is True
+    assert updates["session-a"]["studio"]["team"]["id"] == "team-runtime"
+    assert updates["session-a"]["studio"]["team"]["profileIds"] == ["inspector", "deployer"]
+
+    fetched = server._methods["studio.team.get"]("r2", {"session_id": "session-a"})
+    assert fetched["result"]["team"]["name"] == "Runtime Ops Team"
+
+
+def test_studio_agent_runs_returns_profile_and_team_identity(monkeypatch):
+    class FakeCursor:
+        def fetchall(self):
+            return [
+                {
+                    "id": "child-session",
+                    "title": "Inspect runtime",
+                    "started_at": 10,
+                    "last_active": 20,
+                    "model": "",
+                    "model_config": json.dumps(
+                        {
+                            "model": "profile-model",
+                            "_studio_agent_run": True,
+                            "_studio_parent_session_id": "parent-session",
+                            "_studio_profile_id": "inspector",
+                            "_studio_profile_name": "Inspector",
+                            "_studio_team_id": "runtime-ops-team",
+                        }
+                    ),
+                }
+            ]
+
+    class FakeConn:
+        def execute(self, _query, params):
+            assert params == ("parent-session",)
+            return FakeCursor()
+
+    class FakeLock:
+        def __enter__(self):
+            return None
+
+        def __exit__(self, *_args):
+            return False
+
+    class FakeDb:
+        _conn = FakeConn()
+        _lock = FakeLock()
+
+        def get_messages(self, session_id):
+            assert session_id == "child-session"
+            return [
+                {"role": "user", "content": "check runtime"},
+                {"role": "assistant", "content": [{"text": "runtime ok"}]},
+            ]
+
+    monkeypatch.setattr(server, "_get_db", lambda: FakeDb())
+
+    result = server._methods["studio.agent_runs"]("r1", {"parent_session_id": "parent-session"})
+    run = result["result"]["runs"][0]
+
+    assert run["id"] == "child-session"
+    assert run["model"] == "profile-model"
+    assert run["profile_id"] == "inspector"
+    assert run["profile_name"] == "Inspector"
+    assert run["team_id"] == "runtime-ops-team"
+    assert run["summary"] == "runtime ok"
+    assert run["message_count"] == 2

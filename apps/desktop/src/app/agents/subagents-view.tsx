@@ -3,14 +3,24 @@ import { type ReactNode, useEffect, useMemo, useState } from 'react'
 
 import { useElapsedSeconds } from '@/components/chat/activity-timer'
 import { ActivityTimerText } from '@/components/chat/activity-timer-text'
+import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 import { FadeText } from '@/components/ui/fade-text'
 import { GlyphSpinner } from '@/components/ui/glyph-spinner'
 import { type Translations, useI18n } from '@/i18n'
 import { AlertCircle, CheckCircle2 } from '@/lib/icons'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
-import { getSessionMessages } from '@/hermes'
+import { getProfiles, getSessionMessages } from '@/hermes'
+import { notifyError } from '@/store/notifications'
+import { BUILTIN_STUDIO_AGENT_PRESETS, ensureStudioAgentPresetProfile } from '@/store/studio-team-presets'
 import {
   $subagentsBySession,
   buildSubagentTree,
@@ -147,6 +157,9 @@ export function SubagentsView({ onClose, runtimeSessionId, storedSessionId, requ
   const [selectedRun, setSelectedRun] = useState<StudioAgentRun | null>(null)
   const [replayMessages, setReplayMessages] = useState<SessionMessage[]>([])
   const [loadingReplay, setLoadingReplay] = useState(false)
+  const [presetGalleryOpen, setPresetGalleryOpen] = useState(false)
+  const [importingPresetId, setImportingPresetId] = useState<null | string>(null)
+  const [presetImportStatus, setPresetImportStatus] = useState('')
 
   const activeSessionItems = runtimeSessionId ? (subagentsBySession[runtimeSessionId] ?? []) : []
   const hydrateSessionIds = useMemo(
@@ -227,6 +240,25 @@ export function SubagentsView({ onClose, runtimeSessionId, storedSessionId, requ
     }
   }
 
+  const createAgentFromPreset = async (presetId: string) => {
+    setImportingPresetId(presetId)
+    setPresetImportStatus('')
+
+    try {
+      const profiles = await getProfiles()
+      const result = await ensureStudioAgentPresetProfile(presetId, profiles.profiles)
+
+      if (!result) return
+
+      setPresetImportStatus(result.created ? `Agent created: ${result.profileId}` : `Using existing agent: ${result.profileId}`)
+      setPresetGalleryOpen(false)
+    } catch (error) {
+      notifyError(error, 'Failed to import agent preset')
+    } finally {
+      setImportingPresetId(null)
+    }
+  }
+
   if (selectedRun) {
     return (
       <Panel closeLabel={t.agents.close} onClose={onClose}>
@@ -274,6 +306,13 @@ export function SubagentsView({ onClose, runtimeSessionId, storedSessionId, requ
     <Panel closeLabel={t.agents.close} onClose={onClose}>
       <PanelHeader subtitle={t.agents.subtitle} title={t.agents.title} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain pr-1">
+        <div className="flex shrink-0 items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">Agent presets create Hermes profiles for future delegation.</p>
+          <Button onClick={() => setPresetGalleryOpen(true)} size="sm" variant="outline">
+            From preset
+          </Button>
+        </div>
+        {presetImportStatus ? <p className="text-xs text-muted-foreground">{presetImportStatus}</p> : null}
         <section className="min-w-0 shrink-0">
           <p className="mb-2 text-[0.66rem] font-medium uppercase tracking-wider text-muted-foreground/70">Running</p>
           {runningTree.length > 0 ? <SubagentTree tree={runningTree} /> : <p className="text-xs text-muted-foreground/65">No running agents.</p>}
@@ -296,6 +335,32 @@ export function SubagentsView({ onClose, runtimeSessionId, storedSessionId, requ
           </div>
         </section>
       </div>
+      <Dialog onOpenChange={setPresetGalleryOpen} open={presetGalleryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Start from an agent preset</DialogTitle>
+            <DialogDescription>
+              Agent presets create Hermes profiles when missing. Existing profiles are reused and never overwritten.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-[60vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+            {BUILTIN_STUDIO_AGENT_PRESETS.map(preset => (
+              <article className="rounded-lg border border-border/70 bg-muted/20 p-3" key={preset.id}>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">{preset.name}</h3>
+                  <p className="text-xs text-muted-foreground">{preset.description}</p>
+                </div>
+                <p className="mt-3 rounded border border-border/60 bg-background/60 px-2 py-1 font-mono text-xs text-muted-foreground">
+                  {preset.profileId}
+                </p>
+                <Button className="mt-3 w-full" disabled={importingPresetId !== null} onClick={() => void createAgentFromPreset(preset.id)} size="sm">
+                  {importingPresetId === preset.id ? 'Creating…' : 'Use agent preset'}
+                </Button>
+              </article>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Panel>
   )
 }

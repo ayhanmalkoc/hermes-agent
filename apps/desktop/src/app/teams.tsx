@@ -24,6 +24,12 @@ import {
   type StudioTeam,
   updateStudioTeam
 } from '@/store/studio-teams'
+import {
+  BUILTIN_STUDIO_TEAM_PRESETS,
+  createStudioTeamFromPreset,
+  getStudioTeamPresetAgents,
+  getStudioTeamPresetForTeam
+} from '@/store/studio-team-presets'
 import type { ProfileInfo } from '@/types/hermes'
 
 import {
@@ -65,6 +71,9 @@ export function TeamsView({ onClose }: TeamsViewProps) {
   const [profiles, setProfiles] = useState<ProfileInfo[]>([])
   const [query, setQuery] = useState('')
   const [pendingDelete, setPendingDelete] = useState<null | StudioTeam>(null)
+  const [presetGalleryOpen, setPresetGalleryOpen] = useState(false)
+  const [importingPresetId, setImportingPresetId] = useState<null | string>(null)
+  const [presetImportStatus, setPresetImportStatus] = useState('')
   const [selectedId, setSelectedId] = useState<null | string>(teams[0]?.id ?? null)
   const selected = selectedId ? (teams.find(team => team.id === selectedId) ?? null) : null
   const [draft, setDraft] = useState<TeamDraft>(() => draftFromTeam(selected))
@@ -93,6 +102,11 @@ export function TeamsView({ onClose }: TeamsViewProps) {
 
   const profileNames = useMemo(() => new Set(profiles.map(profile => profile.name)), [profiles])
   const missingProfiles = draft.profileIds.filter(profileId => !profileNames.has(profileId))
+  const selectedPreset = getStudioTeamPresetForTeam(selected)
+  const presetMembersByProfile = useMemo(
+    () => new Map((selectedPreset ? getStudioTeamPresetAgents(selectedPreset) : []).map(agent => [agent.profileId, agent])),
+    [selectedPreset]
+  )
   const visibleTeams = useMemo(() => {
     const needle = query.trim().toLowerCase()
 
@@ -131,6 +145,33 @@ export function TeamsView({ onClose }: TeamsViewProps) {
   const createNew = () => {
     setSelectedId(null)
     setDraft({ description: '', instructions: '', name: 'New team', profileIds: [] })
+  }
+
+  const createFromPreset = async (presetId: string) => {
+    setImportingPresetId(presetId)
+    setPresetImportStatus('')
+
+    try {
+      const result = await createStudioTeamFromPreset(presetId, profiles)
+
+      if (!result) return
+
+      setProfiles(current => {
+        const known = new Set(current.map(profile => profile.name))
+        const createdProfiles = result.agents
+          .filter(agent => agent.created && !known.has(agent.profileId))
+          .map(agent => ({ has_env: false, is_default: false, model: null, name: agent.profileId, path: '', provider: null, skill_count: 0 }))
+
+        return [...current, ...createdProfiles]
+      })
+      setSelectedId(result.team.id)
+      setPresetImportStatus(`Team created with ${result.agents.length} agents`)
+      setPresetGalleryOpen(false)
+    } catch (error) {
+      notifyError(error, 'Failed to import team preset')
+    } finally {
+      setImportingPresetId(null)
+    }
   }
 
   const removeTeam = (teamId: string) => {
@@ -181,6 +222,7 @@ export function TeamsView({ onClose }: TeamsViewProps) {
             />
           ))}
           <PanelAddButton label="New team" onClick={createNew} />
+          <PanelAddButton label="From preset" onClick={() => setPresetGalleryOpen(true)} />
         </PanelList>
 
         {selected || selectedId === null ? (
@@ -223,13 +265,22 @@ export function TeamsView({ onClose }: TeamsViewProps) {
                       checked={draft.profileIds.includes(profile.name)}
                       onCheckedChange={checked => toggleProfile(profile.name, checked === true)}
                     />
-                    <span>{profile.name}</span>
+                    <span>{presetMembersByProfile.get(profile.name)?.name ?? profile.name}</span>
+                    {presetMembersByProfile.has(profile.name) ? <PanelPill tone="muted">{profile.name}</PanelPill> : null}
                     {profile.is_default && <PanelPill tone="good">default</PanelPill>}
+                    {presetMembersByProfile.get(profile.name)?.description ? (
+                      <span className="text-xs text-muted-foreground">{presetMembersByProfile.get(profile.name)?.description}</span>
+                    ) : null}
                   </label>
                 ))}
                 {missingProfiles.map(profileId => (
-                  <div className="flex items-center gap-2 text-sm text-destructive" key={profileId}>
-                    <Codicon name="warning" size="0.9rem" /> Missing profile: {profileId}
+                  <div className="grid gap-1 text-sm text-destructive" key={profileId}>
+                    <div className="flex items-center gap-2">
+                      <Codicon name="warning" size="0.9rem" /> Missing profile: {profileId}
+                    </div>
+                    {presetMembersByProfile.get(profileId)?.description ? (
+                      <p className="pl-6 text-xs text-muted-foreground">{presetMembersByProfile.get(profileId)?.description}</p>
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -270,6 +321,45 @@ export function TeamsView({ onClose }: TeamsViewProps) {
               Delete
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog onOpenChange={setPresetGalleryOpen} open={presetGalleryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Start from a team preset</DialogTitle>
+            <DialogDescription>
+              Presets are copied into your teams. You can edit the copied team without changing the preset.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-[60vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+            {BUILTIN_STUDIO_TEAM_PRESETS.map(preset => {
+              const agents = getStudioTeamPresetAgents(preset)
+
+              return (
+                <article className="rounded-lg border border-border/70 bg-muted/20 p-3" key={preset.id}>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold">{preset.name}</h3>
+                    <p className="text-xs text-muted-foreground">{preset.description}</p>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {agents.map(member => (
+                      <div className="rounded border border-border/60 bg-background/60 p-2" key={`${preset.id}-${member.profileId}`}>
+                        <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
+                          <span>{member.name}</span>
+                          <PanelPill tone={profileNames.has(member.profileId) ? 'good' : 'muted'}>{member.profileId}</PanelPill>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">{member.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <Button className="mt-3 w-full" disabled={importingPresetId !== null} onClick={() => void createFromPreset(preset.id)} size="sm">
+                    {importingPresetId === preset.id ? 'Creating…' : 'Use preset'}
+                  </Button>
+                </article>
+              )
+            })}
+          </div>
+          {presetImportStatus ? <p className="text-xs text-muted-foreground">{presetImportStatus}</p> : null}
         </DialogContent>
       </Dialog>
     </Panel>
