@@ -82,6 +82,27 @@ done
 command -v systemctl >/dev/null 2>&1 || die "systemd not found"
 command -v "$PYTHON_BIN" >/dev/null 2>&1 || die "python not found: $PYTHON_BIN"
 
+if [[ "$FORCE" != true ]]; then
+  EXISTING_BOOTSTRAP_FILES=()
+  for path in \
+    "$ENV_FILE" \
+    "$HERMES_HOME/config.yaml" \
+    "$DASHBOARD_CREDS_FILE" \
+    "$API_CREDS_FILE" \
+    /etc/systemd/system/hermes-gateway.service \
+    /etc/systemd/system/hermes-dashboard.service
+  do
+    if [[ -e "$path" ]]; then
+      EXISTING_BOOTSTRAP_FILES+=("$path")
+    fi
+  done
+  if (( ${#EXISTING_BOOTSTRAP_FILES[@]} > 0 )); then
+    printf '\nERROR: existing runtime bootstrap files found; rerun with --force to overwrite:\n' >&2
+    printf '  %s\n' "${EXISTING_BOOTSTRAP_FILES[@]}" >&2
+    exit 1
+  fi
+fi
+
 write_file() {
   local path="$1"
   local mode="$2"
