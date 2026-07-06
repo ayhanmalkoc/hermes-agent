@@ -6,6 +6,7 @@ RUNTIME_VENV="${RUNTIME_VENV:-/opt/hermes-runtime/.venv}"
 RUNTIME_USER="${RUNTIME_USER:-hermes}"
 RUNTIME_GROUP="${RUNTIME_GROUP:-hermes}"
 PYTHON_BIN="$RUNTIME_VENV/bin/python"
+RUNTIME_EXTRA_PACKAGES="${RUNTIME_EXTRA_PACKAGES:-aiohttp}"
 SERVICES=(hermes-gateway.service hermes-dashboard.service)
 SMOKE_URLS=(
   "http://100.107.234.45:9119/"
@@ -14,34 +15,75 @@ SMOKE_URLS=(
 
 log() { printf '\n==> %s\n' "$*"; }
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
+usage() {
+  cat <<'EOF'
+Usage: sudo scripts/deploy-hermes-runtime.sh [options]
+
+Deploy the current repo commit into the packaged Hermes runtime venv, restart
+systemd services, and smoke-test dashboard + gateway.
+
+Options:
+  --help                Show this help.
+
+Environment overrides:
+  REPO_ROOT=/root/hermes-agent
+  RUNTIME_VENV=/opt/hermes-runtime/.venv
+  RUNTIME_USER=hermes
+  RUNTIME_EXTRA_PACKAGES="aiohttp"
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
 
 [[ $EUID -eq 0 ]] || die "run as root; systemd restart and ownership guards need root"
 [[ -d "$REPO_ROOT" ]] || die "repo not found: $REPO_ROOT"
-[[ -x "$PYTHON_BIN" ]] || die "runtime python not found: $PYTHON_BIN"
+[[ -x "$PYTHON_BIN" ]] || die "runtime python not found: $PYTHON_BIN (install the packaged runtime first)"
 id "$RUNTIME_USER" >/dev/null 2>&1 || die "runtime user not found: $RUNTIME_USER"
 
 cd "$REPO_ROOT"
 
 log "repo state"
-git branch --show-current
-git rev-parse --short HEAD
+BRANCH="$(git branch --show-current)"
+START_HEAD="$(git rev-parse HEAD)"
+printf 'branch=%s\n' "$BRANCH"
+printf 'head=%s\n' "$START_HEAD"
 git status --short
-
-log "desktop build"
-npm --workspace apps/desktop run build
+[[ -z "$(git status --porcelain)" ]] || die "repo has uncommitted changes; commit/push outside this deploy script first"
 
 log "pre-install ownership guard"
 chown -R "$RUNTIME_USER:$RUNTIME_GROUP" "$RUNTIME_VENV"
 
 log "install hermes-agent into runtime venv"
 umask 022
-"$PYTHON_BIN" -m pip install "$REPO_ROOT"
+"$PYTHON_BIN" -m pip install --upgrade --force-reinstall "$REPO_ROOT"
+if [[ -n "$RUNTIME_EXTRA_PACKAGES" ]]; then
+  "$PYTHON_BIN" -m pip install --upgrade $RUNTIME_EXTRA_PACKAGES
+fi
 
 log "post-install permission guard"
 chown -R "$RUNTIME_USER:$RUNTIME_GROUP" "$RUNTIME_VENV"
-if [[ -d "$RUNTIME_VENV/lib/python3.12/site-packages/hermes_cli" ]]; then
-  find "$RUNTIME_VENV/lib/python3.12/site-packages/hermes_cli" -type d -exec chmod 755 {} +
-  find "$RUNTIME_VENV/lib/python3.12/site-packages/hermes_cli" -type f -exec chmod 644 {} +
+SITE_PACKAGES="$($PYTHON_BIN - <<'PY'
+import site
+print(site.getsitepackages()[0])
+PY
+)"
+if [[ -d "$SITE_PACKAGES" ]]; then
+  find "$SITE_PACKAGES" -type d -exec chmod a+rx {} +
+  find "$SITE_PACKAGES" -type f -exec chmod a+r {} +
+  find "$SITE_PACKAGES" -type f -name '*.so' -exec chmod a+rx {} +
+fi
+if [[ -d "$RUNTIME_VENV/bin" ]]; then
+  find "$RUNTIME_VENV/bin" -type f -exec chmod a+rx {} +
 fi
 
 log "import smoke as $RUNTIME_USER"
@@ -49,6 +91,9 @@ runuser -u "$RUNTIME_USER" -- "$PYTHON_BIN" - <<'PY'
 import hermes_cli.main
 print(hermes_cli.main.__file__)
 PY
+
+log "runtime version"
+"$RUNTIME_VENV/bin/hermes" --version | head -12
 
 log "restart services"
 systemctl restart "${SERVICES[@]}"
@@ -88,3 +133,4 @@ for url, ok_statuses in urls:
 PY
 
 log "done"
+printf 'deployed_commit=%s\n' "$(git rev-parse HEAD)"
