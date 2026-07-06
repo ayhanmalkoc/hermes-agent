@@ -15,6 +15,10 @@ SMOKE_URLS=(
   "http://$TAILNET_IP:$DASHBOARD_PORT/"
   "http://$TAILNET_IP:$GATEWAY_PORT/health"
 )
+ENV_FILE="${ENV_FILE:-/etc/hermes/hermes.env}"
+RUNTIME_HOME="${RUNTIME_HOME:-/var/lib/hermes}"
+HERMES_HOME="${HERMES_HOME:-$RUNTIME_HOME/.hermes}"
+LOG_DIR="${LOG_DIR:-/var/log/hermes}"
 
 log() { printf '\n==> %s\n' "$*"; }
 die() { printf '\nERROR: %s\n' "$*" >&2; exit 1; }
@@ -35,8 +39,66 @@ Environment overrides:
   TAILNET_IP=100.107.234.45
   GATEWAY_PORT=8642
   DASHBOARD_PORT=9119
+  ENV_FILE=/etc/hermes/hermes.env
+  RUNTIME_HOME=/var/lib/hermes
+  HERMES_HOME=/var/lib/hermes/.hermes
   RUNTIME_EXTRA_PACKAGES="aiohttp"
 EOF
+}
+
+write_systemd_units() {
+  cat >/etc/systemd/system/hermes-gateway.service <<EOF
+[Unit]
+Description=Hermes Agent Gateway - Messaging Platform Integration
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=$RUNTIME_USER
+Group=$RUNTIME_GROUP
+WorkingDirectory=$HERMES_HOME
+EnvironmentFile=$ENV_FILE
+ExecStart=$RUNTIME_VENV/bin/python -m hermes_cli.main gateway run
+Restart=always
+RestartSec=5
+RestartForceExitStatus=75
+KillMode=mixed
+KillSignal=SIGTERM
+ExecReload=/bin/kill -USR1 \$MAINPID
+ExecStopPost=-$RUNTIME_VENV/bin/python -m gateway.cgroup_cleanup
+TimeoutStopSec=210
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  cat >/etc/systemd/system/hermes-dashboard.service <<EOF
+[Unit]
+Description=Hermes Agent web dashboard
+After=network-online.target hermes-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$RUNTIME_USER
+Group=$RUNTIME_GROUP
+WorkingDirectory=$RUNTIME_HOME
+EnvironmentFile=$ENV_FILE
+ExecStart=$RUNTIME_VENV/bin/hermes dashboard --host $TAILNET_IP --port $DASHBOARD_PORT --no-open --skip-build
+Restart=always
+RestartSec=5
+StandardOutput=append:$LOG_DIR/dashboard.log
+StandardError=append:$LOG_DIR/dashboard.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  systemctl daemon-reload
 }
 
 while [[ $# -gt 0 ]]; do
@@ -55,6 +117,7 @@ done
 [[ -d "$REPO_ROOT" ]] || die "repo not found: $REPO_ROOT"
 [[ -x "$PYTHON_BIN" ]] || die "runtime python not found: $PYTHON_BIN (install the packaged runtime first)"
 id "$RUNTIME_USER" >/dev/null 2>&1 || die "runtime user not found: $RUNTIME_USER"
+[[ -f "$ENV_FILE" ]] || die "runtime env file not found: $ENV_FILE"
 
 cd "$REPO_ROOT"
 
@@ -100,6 +163,9 @@ PY
 
 log "runtime version"
 "$RUNTIME_VENV/bin/hermes" --version | head -12
+
+log "systemd unit guard"
+write_systemd_units
 
 log "restart services"
 systemctl restart "${SERVICES[@]}"
