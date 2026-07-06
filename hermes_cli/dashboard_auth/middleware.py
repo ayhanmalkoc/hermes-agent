@@ -177,7 +177,10 @@ def _auto_sso_response(request: Request) -> Response | None:
 
     # list_session_providers() already filters on supports_session=True, so
     # token-only credentials (drain/service providers) are never candidates.
-    providers = list_session_providers()
+    providers = [
+        provider for provider in list_session_providers()
+        if not getattr(provider, "supports_password", False)
+    ]
     if len(providers) != 1:
         # Zero → nothing to redirect to. Two+ → user must choose at /login.
         return None
@@ -458,4 +461,3 @@ def _attempt_refresh(request: Request, *, refresh_token):
         if new_session is not None:
             return new_session, provider.name
     return None
-
