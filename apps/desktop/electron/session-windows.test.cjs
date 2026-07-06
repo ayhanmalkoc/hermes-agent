@@ -65,6 +65,12 @@ test('buildSessionWindowUrl avoids a double slash when the dev server has a trai
   assert.equal(url, 'http://localhost:5173/?win=secondary#/abc123')
 })
 
+test('buildSessionWindowUrl can use a custom dev renderer origin', () => {
+  const url = buildSessionWindowUrl('abc123', { devRendererUrl: 'hermes-app://hermes/' })
+
+  assert.equal(url, 'hermes-app://hermes/?win=secondary#/abc123')
+})
+
 test('buildSessionWindowUrl encodes the session id in the hash route', () => {
   const url = buildSessionWindowUrl('a b/c', { devServer: 'http://localhost:5173' })
 

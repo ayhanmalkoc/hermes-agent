@@ -697,7 +697,17 @@ app.setAboutPanelOptions({
   copyright: 'Copyright © 2026 Nous Research'
 })
 
-// Custom scheme for streaming local media (video/audio) into the renderer.
+const DEV_RENDERER_PROTOCOL = 'hermes-app'
+const DEV_RENDERER_HOST = 'hermes'
+
+function devRendererUrl(suffix = '/') {
+  const pathSuffix = suffix.startsWith('/') ? suffix : `/${suffix}`
+  return `${DEV_RENDERER_PROTOCOL}://${DEV_RENDERER_HOST}${pathSuffix}`
+}
+
+// Custom schemes used by the renderer. In dev, we also proxy Vite through a
+// non-web hermes-app:// origin so remote OAuth gateways do not reject WebSocket dials
+// as cross-site http://127.0.0.1:5174 -> remote-host origin mismatches.
 // Reading large media through `readFileDataUrl` failed: it base64-loads the
 // whole file into memory and is hard-capped at DATA_URL_READ_MAX_BYTES (16 MB),
 // so any non-trivial video silently refused to load. Streaming via a protocol
@@ -722,6 +732,14 @@ const STREAMABLE_MEDIA_EXTS = new Set([
 
 protocol.registerSchemesAsPrivileged([
   {
+    scheme: DEV_RENDERER_PROTOCOL,
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true
+    }
+  },
+  {
     scheme: MEDIA_PROTOCOL,
     privileges: {
       secure: true,
@@ -731,6 +749,22 @@ protocol.registerSchemesAsPrivileged([
     }
   }
 ])
+
+function registerDevRendererProtocol() {
+  if (!DEV_SERVER) return
+
+  const base = DEV_SERVER.endsWith('/') ? DEV_SERVER.slice(0, -1) : DEV_SERVER
+  protocol.handle(DEV_RENDERER_PROTOCOL, request => {
+    const url = new URL(request.url)
+    if (url.hostname !== DEV_RENDERER_HOST) {
+      return new Response('Not found', { status: 404 })
+    }
+
+    return electronNet.fetch(`${base}${url.pathname}${url.search}`, {
+      bypassCustomProtocolHandlers: true
+    })
+  })
+}
 
 function registerMediaProtocol() {
   protocol.handle(MEDIA_PROTOCOL, async request => {
@@ -5724,6 +5758,7 @@ function spawnSecondaryWindow({ sessionId, watch, newSession } = {}) {
   win.loadURL(
     buildSessionWindowUrl(sessionId, {
       devServer: DEV_SERVER,
+      devRendererUrl: DEV_SERVER ? devRendererUrl('/') : undefined,
       rendererIndexPath: DEV_SERVER ? undefined : resolveRendererIndex(),
       watch,
       newSession
@@ -5756,7 +5791,7 @@ let petOverlayWindow = null
 
 function petOverlayUrl() {
   if (DEV_SERVER) {
-    return `${DEV_SERVER.endsWith('/') ? DEV_SERVER.slice(0, -1) : DEV_SERVER}/?win=overlay#/`
+    return devRendererUrl('/?win=overlay#/')
   }
 
   return `${pathToFileURL(resolveRendererIndex()).toString()}?win=overlay#/`
@@ -6001,7 +6036,7 @@ function createWindow() {
   })
 
   if (DEV_SERVER) {
-    mainWindow.loadURL(DEV_SERVER)
+    mainWindow.loadURL(devRendererUrl('/'))
   } else {
     mainWindow.loadURL(pathToFileURL(resolveRendererIndex()).toString())
   }
@@ -7559,6 +7594,7 @@ app.whenReady().then(() => {
     Menu.setApplicationMenu(null)
   }
   installMediaPermissions()
+  registerDevRendererProtocol()
   registerMediaProtocol()
   installEmbedReferer()
   registerDeepLinkProtocol()
