@@ -192,8 +192,16 @@ export function studioTeamPromptContextFromTeam(team: null | StudioTeam): string
     team.description ? `Description: ${team.description}` : '',
     `Members: ${members}`,
     `Instructions: ${instructions}`,
-    'The active Hermes profile is the lead/manager.',
-    'When delegating to a listed member, call delegate_task with that member id as tasks[].profile_id (or profile_id for a single task) so the child run uses the member profile runtime.'
+    'The active Hermes profile is the lead/manager for this Studio team.',
+    'The listed members are specialized Hermes profiles available for delegated work.',
+    'Use the team deliberately:',
+    '- For simple one-shot questions, short explanations, direct answers, or trivial confirmations, answer directly without delegation.',
+    '- For multi-step, ambiguous, high-risk, coding, research, design, testing, review, deployment, or runtime-ops work, consider delegating useful sub-tasks with delegate_task.',
+    '- Do not delegate just because a team exists; delegate when parallel expertise materially improves quality, speed, or confidence.',
+    '- When delegating, use each member exact profile id with tasks[].profile_id, or profile_id for a single task.',
+    '- Give each delegated member a focused goal, relevant context, and expected output.',
+    '- After delegated work completes, synthesize the results yourself and present one coherent answer.',
+    '- If no listed member fits a needed sub-task, handle it yourself or explain the gap briefly.'
   ]
     .filter(Boolean)
     .join('\n')

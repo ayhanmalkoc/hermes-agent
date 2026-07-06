@@ -85,6 +85,9 @@ describe('studio teams store', () => {
     expect(studioTeamPromptContext(null)).toContain('No explicit members selected')
     expect(studioTeamPromptContext(null)).toContain('The active Hermes profile is the lead/manager')
     expect(studioTeamPromptContext(null)).toContain('delegate_task')
+    expect(studioTeamPromptContext(null)).toContain('Do not delegate just because a team exists')
+    expect(studioTeamPromptContext(null)).toContain('For simple one-shot questions')
+    expect(studioTeamPromptContext(null)).toContain('tasks[].profile_id')
     expect(studioTeamPromptContext(null)).toContain('profile_id')
   })
 
@@ -127,7 +130,7 @@ describe('studio teams store', () => {
     expect(client.updateProfileSoul).not.toHaveBeenCalled()
   })
 
-  it('creates a missing profile for an agent preset and writes SOUL once', async () => {
+  it('creates an absent profile for an agent preset and writes SOUL once', async () => {
     const client = profileClient()
     const result = await ensureStudioAgentPresetProfile('planner', [profile('default')], client)
 

@@ -31,8 +31,9 @@ import { profileColorSoft, resolveProfileColor } from '@/lib/profile-color'
 import { slug } from '@/lib/sanitize'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
-import { $profileColors } from '@/store/profile'
+import { $profileColors, refreshActiveProfile } from '@/store/profile'
 import { $studioTeams, updateStudioTeam } from '@/store/studio-teams'
+import { BUILTIN_STUDIO_AGENT_PRESETS, ensureStudioAgentPresetProfile } from '@/store/studio-team-presets'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
 import {
@@ -72,6 +73,9 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
   const [pendingRename, setPendingRename] = useState<null | ProfileInfo>(null)
   const [pendingDelete, setPendingDelete] = useState<null | ProfileInfo>(null)
   const [deleting, setDeleting] = useState(false)
+  const [presetGalleryOpen, setPresetGalleryOpen] = useState(false)
+  const [importingPresetId, setImportingPresetId] = useState<null | string>(null)
+  const [presetImportStatus, setPresetImportStatus] = useState('')
 
   const refresh = useCallback(async () => {
     try {
@@ -171,6 +175,31 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
     }
   }, [p, pendingDelete, refresh])
 
+  const createAgentFromPreset = useCallback(
+    async (presetId: string) => {
+      setImportingPresetId(presetId)
+      setPresetImportStatus('')
+
+      try {
+        const result = await ensureStudioAgentPresetProfile(presetId, profiles ?? [])
+
+        if (!result) return
+
+        setPresetImportStatus(result.created ? `Agent created: ${result.profileId}` : `Using existing agent: ${result.profileId}`)
+        notify({ kind: 'success', title: result.created ? 'Agent created' : 'Using existing agent', message: result.profileId })
+        setSelectedName(result.profileId)
+        setPresetGalleryOpen(false)
+        await refresh()
+        await refreshActiveProfile()
+      } catch (err) {
+        notifyError(err, 'Failed to import agent preset')
+      } finally {
+        setImportingPresetId(null)
+      }
+    },
+    [profiles, refresh]
+  )
+
   return (
     <Panel closeLabel={p.close} onClose={onClose}>
       {!profiles ? (
@@ -222,7 +251,10 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
                 />
               ))}
               <PanelAddButton label={p.newProfile} onClick={() => setCreateOpen(true)} />
+              <PanelAddButton icon="sparkle" label="From preset" onClick={() => setPresetGalleryOpen(true)} />
             </PanelList>
+
+            {presetImportStatus ? <p className="px-1 text-xs text-muted-foreground">{presetImportStatus}</p> : null}
 
             {selected ? (
               <ProfileDetail key={selected.name} profile={selected} showTeamLinks={showTeamLinks} />
@@ -251,6 +283,33 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
         open={createOpen}
         profiles={profiles ?? []}
       />
+
+      <Dialog onOpenChange={setPresetGalleryOpen} open={presetGalleryOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Start from an agent preset</DialogTitle>
+            <DialogDescription>
+              Agent presets create Hermes profiles. Existing profiles are reused and never overwritten.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid max-h-[60vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2">
+            {BUILTIN_STUDIO_AGENT_PRESETS.map(preset => (
+              <article className="rounded-lg border border-border/70 bg-muted/20 p-3" key={preset.id}>
+                <div className="space-y-1">
+                  <h3 className="text-sm font-semibold">{preset.name}</h3>
+                  <p className="text-xs text-muted-foreground">{preset.description}</p>
+                </div>
+                <p className="mt-3 rounded border border-border/60 bg-background/60 px-2 py-1 font-mono text-xs text-muted-foreground">
+                  {preset.profileId}
+                </p>
+                <Button className="mt-3 w-full" disabled={importingPresetId !== null} onClick={() => void createAgentFromPreset(preset.id)} size="sm">
+                  {importingPresetId === preset.id ? 'Creating…' : 'Use agent preset'}
+                </Button>
+              </article>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog onOpenChange={open => !open && !deleting && setPendingDelete(null)} open={pendingDelete !== null}>
         <DialogContent className="max-w-md">

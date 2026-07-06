@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Save } from '@/lib/icons'
 import { getProfiles } from '@/hermes'
 import { notifyError } from '@/store/notifications'
+import { refreshActiveProfile } from '@/store/profile'
 import {
   $studioTeams,
   createStudioTeam,
@@ -100,8 +101,7 @@ export function TeamsView({ onClose }: TeamsViewProps) {
     setSelectedId(teams[0]?.id ?? null)
   }, [selectedId, teams])
 
-  const profileNames = useMemo(() => new Set(profiles.map(profile => profile.name)), [profiles])
-  const missingProfiles = draft.profileIds.filter(profileId => !profileNames.has(profileId))
+  const existingProfileNames = useMemo(() => new Set(profiles.map(profile => profile.name)), [profiles])
   const selectedPreset = getStudioTeamPresetForTeam(selected)
   const presetMembersByProfile = useMemo(
     () => new Map((selectedPreset ? getStudioTeamPresetAgents(selectedPreset) : []).map(agent => [agent.profileId, agent])),
@@ -167,6 +167,7 @@ export function TeamsView({ onClose }: TeamsViewProps) {
       setSelectedId(result.team.id)
       setPresetImportStatus(`Team created with ${result.agents.length} agents`)
       setPresetGalleryOpen(false)
+      await refreshActiveProfile()
     } catch (error) {
       notifyError(error, 'Failed to import team preset')
     } finally {
@@ -222,7 +223,7 @@ export function TeamsView({ onClose }: TeamsViewProps) {
             />
           ))}
           <PanelAddButton label="New team" onClick={createNew} />
-          <PanelAddButton label="From preset" onClick={() => setPresetGalleryOpen(true)} />
+          <PanelAddButton icon="sparkle" label="From preset" onClick={() => setPresetGalleryOpen(true)} />
         </PanelList>
 
         {selected || selectedId === null ? (
@@ -272,16 +273,6 @@ export function TeamsView({ onClose }: TeamsViewProps) {
                       <span className="text-xs text-muted-foreground">{presetMembersByProfile.get(profile.name)?.description}</span>
                     ) : null}
                   </label>
-                ))}
-                {missingProfiles.map(profileId => (
-                  <div className="grid gap-1 text-sm text-destructive" key={profileId}>
-                    <div className="flex items-center gap-2">
-                      <Codicon name="warning" size="0.9rem" /> Missing profile: {profileId}
-                    </div>
-                    {presetMembersByProfile.get(profileId)?.description ? (
-                      <p className="pl-6 text-xs text-muted-foreground">{presetMembersByProfile.get(profileId)?.description}</p>
-                    ) : null}
-                  </div>
                 ))}
               </div>
             </section>
@@ -346,7 +337,7 @@ export function TeamsView({ onClose }: TeamsViewProps) {
                       <div className="rounded border border-border/60 bg-background/60 p-2" key={`${preset.id}-${member.profileId}`}>
                         <div className="flex flex-wrap items-center gap-1.5 text-xs font-medium">
                           <span>{member.name}</span>
-                          <PanelPill tone={profileNames.has(member.profileId) ? 'good' : 'muted'}>{member.profileId}</PanelPill>
+                          <PanelPill tone={existingProfileNames.has(member.profileId) ? 'good' : 'muted'}>{member.profileId}</PanelPill>
                         </div>
                         <p className="mt-1 text-xs text-muted-foreground">{member.description}</p>
                       </div>
