@@ -40,17 +40,19 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
       <SelectTrigger
         aria-label="Team"
         className={cn(
-          'relative h-7 w-auto overflow-hidden px-2 text-xs transition-colors',
+          'group relative h-7 w-auto px-2 text-xs transition-colors',
           selectedTeam
-            ? 'rounded-[8px] bg-primary/[0.06] hover:bg-primary/10 data-[state=open]:bg-primary/10'
+            ? 'rounded-[8px] border-transparent bg-primary/[0.06] hover:bg-primary/10 data-[state=open]:bg-primary/10'
             : 'rounded-full',
           className
         )}
         title="Team"
       >
         {selectedTeam ? <span aria-hidden className="arc-border arc-reverse arc-nous" /> : null}
-        <Codicon aria-hidden="true" name="organization" size="0.9rem" />
-        <SelectValue placeholder="Team" />
+        <span className="relative z-10 flex min-w-0 items-center gap-2">
+          <Codicon aria-hidden="true" name="organization" size="0.9rem" />
+          <SelectValue placeholder="Team" />
+        </span>
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NO_TEAM}>No team</SelectItem>
