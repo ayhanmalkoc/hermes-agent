@@ -115,8 +115,7 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
     ordered.findIndex(profile => normalizeProfileKey(profile.name) === activeProfile)
   )
   const active = ordered[activeIndex] ?? ordered.find(profile => profile.is_default) ?? null
-  const left = ordered.slice(0, activeIndex)
-  const right = ordered.slice(activeIndex + 1)
+  const { left, right } = active ? distributeProfilesAroundActive(ordered, activeIndex) : { left: [], right: [] }
 
   if (!profiles.length || !active) {
     return null
@@ -124,15 +123,12 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
 
   return (
     <div className={cn('pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8', className)}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background/70 to-transparent"
-      />
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background/70 to-transparent"
-      />
-      <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative min-w-0 overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-linear-to-r from-background/75 to-transparent"
+        />
+        <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto px-3 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {left.map(profile => (
           <AgentProfileRailButton
             active={false}
@@ -141,11 +137,17 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
             profile={profile}
           />
         ))}
+        </div>
       </div>
       <div className="flex justify-center px-1">
         <AgentProfileRailButton active color={resolveProfileColor(active.name, colors)} profile={active} />
       </div>
-      <div className="flex min-w-0 items-center justify-start gap-2 overflow-x-auto pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="relative min-w-0 overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-linear-to-l from-background/75 to-transparent"
+        />
+        <div className="flex min-w-0 items-center justify-start gap-2 overflow-x-auto px-3 pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {right.map(profile => (
           <AgentProfileRailButton
             active={false}
@@ -154,9 +156,26 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
             profile={profile}
           />
         ))}
+        </div>
       </div>
     </div>
   )
+}
+
+function distributeProfilesAroundActive(profiles: ProfileInfo[], activeIndex: number) {
+  const left: ProfileInfo[] = []
+  const right: ProfileInfo[] = []
+  const others = profiles.filter((_, index) => index !== activeIndex)
+
+  others.forEach((profile, index) => {
+    if (index % 2 === 0) {
+      left.unshift(profile)
+    } else {
+      right.push(profile)
+    }
+  })
+
+  return { left, right }
 }
 
 function orderProfilesForComposer(profiles: ProfileInfo[], order: string[]): ProfileInfo[] {
