@@ -52,12 +52,8 @@ export function messageAttachmentRefs(value: unknown): string[] {
   return value.every(ref => typeof ref === 'string') ? value : EMPTY_ATTACHMENT_REFS
 }
 
-export function pickPrimaryPreviewTarget(targets: string[]): string[] {
-  if (targets.length <= 1) {
-    return targets
-  }
+const MAX_PREVIEW_TARGETS = 4
 
-  const localUrl = targets.find(value => /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i.test(value))
-
-  return [localUrl || targets[targets.length - 1]]
+export function pickPreviewTargets(targets: string[]): string[] {
+  return targets.slice(0, MAX_PREVIEW_TARGETS)
 }

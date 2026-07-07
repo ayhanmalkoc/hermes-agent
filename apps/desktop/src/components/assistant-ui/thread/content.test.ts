@@ -5,7 +5,7 @@ import {
   messageAttachmentRefs,
   messageContentText,
   partText,
-  pickPrimaryPreviewTarget
+  pickPreviewTargets
 } from './content'
 
 describe('partText', () => {
@@ -68,19 +68,19 @@ describe('messageAttachmentRefs', () => {
   })
 })
 
-describe('pickPrimaryPreviewTarget', () => {
+describe('pickPreviewTargets', () => {
   it('returns the input when one or zero targets', () => {
-    expect(pickPrimaryPreviewTarget([])).toEqual([])
-    expect(pickPrimaryPreviewTarget(['https://x.dev'])).toEqual(['https://x.dev'])
+    expect(pickPreviewTargets([])).toEqual([])
+    expect(pickPreviewTargets(['https://x.dev'])).toEqual(['https://x.dev'])
   })
 
-  it('prefers a localhost URL when present', () => {
-    expect(pickPrimaryPreviewTarget(['https://example.com', 'http://localhost:3000'])).toEqual([
-      'http://localhost:3000'
-    ])
+  it('keeps multiple localhost and loopback targets', () => {
+    expect(
+      pickPreviewTargets(['http://localhost:5173/demo', 'https://localhost:5173/demo', 'http://127.0.0.1:3000/preview'])
+    ).toEqual(['http://localhost:5173/demo', 'https://localhost:5173/demo', 'http://127.0.0.1:3000/preview'])
   })
 
-  it('falls back to the last target when no localhost URL', () => {
-    expect(pickPrimaryPreviewTarget(['https://a.dev', 'https://b.dev'])).toEqual(['https://b.dev'])
+  it('caps preview targets to avoid noisy messages', () => {
+    expect(pickPreviewTargets(['a', 'b', 'c', 'd', 'e'])).toEqual(['a', 'b', 'c', 'd'])
   })
 })

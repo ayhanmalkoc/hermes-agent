@@ -17,6 +17,23 @@ describe('preview target detection', () => {
     expect(extractPreviewTargets('Open https://example.com/tmp/demo.html')).toEqual([])
   })
 
+  it('keeps multiple local preview targets in order', () => {
+    expect(
+      extractPreviewTargets(
+        ['http://localhost:5173/demo', 'https://localhost:5173/demo', 'http://127.0.0.1:3000/preview'].join('\n')
+      )
+    ).toEqual(['http://localhost:5173/demo', 'https://localhost:5173/demo', 'http://127.0.0.1:3000/preview'])
+  })
+
+  it('ignores preview-looking urls inside fenced code blocks', () => {
+    const text = ['Before http://localhost:5173/visible', '```txt', 'http://localhost:9999/inside-code-block', '```'].join(
+      '\n'
+    )
+
+    expect(extractPreviewTargets(text)).toEqual(['http://localhost:5173/visible'])
+    expect(mayContainPreviewTarget(['```txt', 'http://localhost:9999/inside-code-block', '```'].join('\n'))).toBe(false)
+  })
+
   it('does not infer preview targets from raw file paths', () => {
     expect(
       extractPreviewTargets([

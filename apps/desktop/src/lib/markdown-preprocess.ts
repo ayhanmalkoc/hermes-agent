@@ -16,9 +16,6 @@ const INLINE_CODE_SPLIT_RE = /(`[^`\n]+`)/g
 // and keeps the emphasis run intact. Other trailing punctuation is still peeled
 // off by the final `[^\s<>"'`*.,;:!?]` class.
 const RAW_URL_RE = /https?:\/\/[^\s<>"'`*]+[^\s<>"'`*.,;:!?]/g
-const LOCAL_PREVIEW_URL_RE = /(^|\s)https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?\/?[^\s<>"'`]*/gi
-const LOCAL_PREVIEW_ONLY_RE = /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?\/?$/i
-const URL_ONLY_LINE_RE = /^\s*https?:\/\/\S+\s*$/i
 const CITATION_MARKER_RE = /(?<=[\p{L}\p{N})\].,!?:;"'”’])\[(?:\d+(?:\s*,\s*\d+)*)\](?!\()/gu
 
 /**
@@ -119,12 +116,6 @@ function stripEmptyFenceBlocks(text: string): string {
   return text.replace(EMPTY_FENCE_BLOCK_RE, '$1')
 }
 
-function isUrlOnlyBlock(lines: string[]): boolean {
-  const nonEmpty = lines.filter(line => line.trim())
-
-  return nonEmpty.length > 0 && nonEmpty.every(line => URL_ONLY_LINE_RE.test(line))
-}
-
 function autoLinkRawUrls(text: string): string {
   return text.replace(RAW_URL_RE, (url: string, index: number) => {
     const previous = text[index - 1] || ''
@@ -144,9 +135,7 @@ function normalizeVisibleProse(text: string): string {
     .map(part =>
       part.startsWith('`')
         ? part
-        : autoLinkRawUrls(
-            part.replace(/`{3,}/g, '').replace(LOCAL_PREVIEW_URL_RE, '$1').replace(CITATION_MARKER_RE, '')
-          )
+        : autoLinkRawUrls(part.replace(/`{3,}/g, '').replace(CITATION_MARKER_RE, ''))
     )
     .join('')
 }
@@ -235,19 +224,6 @@ function normalizeFenceBlocks(text: string): string {
     const body = bodyLines.join('\n')
 
     if (closeIndex !== -1 && !body.trim()) {
-      index = closeIndex + 1
-
-      continue
-    }
-
-    if (closeIndex !== -1 && LOCAL_PREVIEW_ONLY_RE.test(body.trim())) {
-      index = closeIndex + 1
-
-      continue
-    }
-
-    if (closeIndex !== -1 && isUrlOnlyBlock(bodyLines)) {
-      extend(out, bodyLines)
       index = closeIndex + 1
 
       continue

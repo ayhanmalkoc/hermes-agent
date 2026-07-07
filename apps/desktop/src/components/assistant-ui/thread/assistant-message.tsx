@@ -12,7 +12,7 @@ import { type FC, useCallback, useMemo, useState } from 'react'
 import {
   contentHasVisibleText,
   messageContentText,
-  pickPrimaryPreviewTarget
+  pickPreviewTargets
 } from '@/components/assistant-ui/thread/content'
 import { MESSAGE_PARTS_COMPONENTS } from '@/components/assistant-ui/thread/message-parts'
 import { StreamStallIndicator } from '@/components/assistant-ui/thread/status'
@@ -78,7 +78,7 @@ export const AssistantMessage: FC<{
       return []
     }
 
-    return pickPrimaryPreviewTarget(extractPreviewTargets(completedText))
+    return pickPreviewTargets(extractPreviewTargets(completedText))
   }, [completedText])
 
   const getMessageText = useCallback(() => messageContentText(messageRuntime.getState().content), [messageRuntime])

@@ -1,5 +1,10 @@
 const PREVIEW_MARKDOWN_RE = /\[Preview:[^\]]+\]\((?<href>#preview[:/][^)]+)\)/gi
 const LOCAL_PREVIEW_URL_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])[^\s`)'"<>]*/gi
+const FENCED_CODE_BLOCK_RE = /(^|\n)[ \t]*(?:`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*(?:`{3,}|~{3,})(?=\n|$)/g
+
+function withoutFencedCodeBlocks(text: string): string {
+  return text.replace(FENCED_CODE_BLOCK_RE, '$1')
+}
 
 export function stripPreviewTargets(text: string): string {
   return text
@@ -10,6 +15,7 @@ export function stripPreviewTargets(text: string): string {
 }
 
 export function extractPreviewTargets(text: string): string[] {
+  const visibleText = withoutFencedCodeBlocks(text)
   const targets: string[] = []
   const seen = new Set<string>()
 
@@ -20,11 +26,11 @@ export function extractPreviewTargets(text: string): string[] {
     }
   }
 
-  for (const match of text.matchAll(PREVIEW_MARKDOWN_RE)) {
+  for (const match of visibleText.matchAll(PREVIEW_MARKDOWN_RE)) {
     pushTarget(previewTargetFromMarkdownHref(match.groups?.href))
   }
 
-  for (const match of text.matchAll(LOCAL_PREVIEW_URL_RE)) {
+  for (const match of visibleText.matchAll(LOCAL_PREVIEW_URL_RE)) {
     pushTarget(match[0]?.replace(/[),.;:]+$/, '') || null)
   }
 
@@ -32,7 +38,7 @@ export function extractPreviewTargets(text: string): string[] {
 }
 
 export function mayContainPreviewTarget(text: string): boolean {
-  return /#preview[:/]|https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i.test(text)
+  return /#preview[:/]|https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i.test(withoutFencedCodeBlocks(text))
 }
 
 export function previewMarkdownHref(target: string): string {

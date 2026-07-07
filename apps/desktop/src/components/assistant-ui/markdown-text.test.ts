@@ -16,7 +16,7 @@ describe('preprocessMarkdown', () => {
 
     expect(output).not.toContain('```')
     expect(output).toContain("Here's your scene:")
-    expect(output).not.toContain('http://localhost:8812/')
+    expect(output).toContain('<http://localhost:8812/>')
     expect(output).toContain('- **Multicolored cube**')
   })
 
@@ -33,19 +33,19 @@ describe('preprocessMarkdown', () => {
     const output = preprocessMarkdown(input)
 
     expect(output).not.toContain('```')
-    expect(output).not.toContain('http://localhost:8812/')
+    expect(output).toContain('<http://localhost:8812/>')
     expect(output).toContain('- **Scroll wheel** - zoom')
   })
 
-  it('drops fences around a preview-only URL block', () => {
+  it('preserves fences around a preview-only URL block', () => {
     const fence = '```'
     const input = ['Server is back.', '', fence, 'http://localhost:8812/', fence].join('\n')
 
     const output = preprocessMarkdown(input)
 
     expect(output).toContain('Server is back.')
-    expect(output).not.toContain('```')
-    expect(output).not.toContain('http://localhost:8812/')
+    expect(output).toContain('```')
+    expect(output).toContain('http://localhost:8812/')
   })
 
   it('demotes prose sentence masquerading as fence info', () => {
@@ -149,7 +149,7 @@ describe('preprocessMarkdown', () => {
     )
   })
 
-  it('demotes url-only fenced blocks to clickable markdown links', () => {
+  it('keeps url-only fenced blocks as code', () => {
     const input = [
       'Sea Turtles & Manatees Snorkel + Free Rum — 1.5hr, ~$56',
       '```',
@@ -164,13 +164,22 @@ describe('preprocessMarkdown', () => {
 
     const output = preprocessMarkdown(input)
 
-    expect(output).not.toContain('```')
+    expect(output).toContain('```')
     expect(output).toContain(
+      'https://www.getyourguide.com/san-juan-puerto-rico-l355/san-juan-snorkel-sea-turtles-manatees-free-video-rum-t879147/'
+    )
+    expect(output).not.toContain(
       '<https://www.getyourguide.com/san-juan-puerto-rico-l355/san-juan-snorkel-sea-turtles-manatees-free-video-rum-t879147/>'
     )
-    expect(output).toContain(
-      '<https://www.getyourguide.com/en-gb/san-juan-puerto-rico-l355/san-juan-old-san-juan-sunset-cruise-with-drinks-transfer-t405191/>'
+  })
+
+  it('keeps localhost and loopback urls visible in prose', () => {
+    const output = preprocessMarkdown(
+      ['Local app: http://localhost:5173/demo', 'Loopback: http://127.0.0.1:3000/preview'].join('\n')
     )
+
+    expect(output).toContain('<http://localhost:5173/demo>')
+    expect(output).toContain('<http://127.0.0.1:3000/preview>')
   })
 
   it('does not swallow trailing emphasis asterisks into an autolinked url', () => {
