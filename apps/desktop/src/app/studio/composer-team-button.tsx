@@ -1,5 +1,4 @@
 import { useStore } from '@nanostores/react'
-import { useState } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -103,14 +102,14 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
 
 interface AgentProfileRailProps {
   className?: string
+  onClose?: () => void
 }
 
-export function AgentProfileRail({ className }: AgentProfileRailProps) {
+export function AgentProfileRail({ className, onClose }: AgentProfileRailProps) {
   const profiles = useStore($profiles)
   const activeProfile = normalizeProfileKey(useStore($activeGatewayProfile))
   const order = useStore($profileOrder)
   const colors = useStore($profileColors)
-  const [collapsed, setCollapsed] = useState(false)
   const ordered = orderProfilesForComposer(profiles, order)
   const activeIndex = Math.max(
     0,
@@ -123,40 +122,17 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
     return null
   }
 
-  if (collapsed) {
-    return (
-      <div className={cn('group/agent-rail pointer-events-none relative flex w-full justify-center px-8', className)}>
-        <button
-          aria-label="Expand agent profiles"
-          className="pointer-events-auto absolute left-2 top-1/2 grid size-5 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/55 opacity-0 transition hover:bg-muted/30 hover:text-foreground group-hover/agent-rail:opacity-100"
-          onClick={() => setCollapsed(false)}
-          onPointerDown={event => event.stopPropagation()}
-          title="Expand agent profiles"
-          type="button"
-        >
-          <Codicon aria-hidden="true" name="chevron-up" size="0.78rem" />
-        </button>
-        <AgentProfileRailButton
-          active
-          color={resolveProfileColor(active.name, colors)}
-          onSelect={() => setCollapsed(false)}
-          profile={active}
-        />
-      </div>
-    )
-  }
-
   return (
     <div className={cn('group/agent-rail pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8', className)}>
       <button
-        aria-label="Collapse agent profiles"
-        className="pointer-events-auto absolute left-2 top-1/2 z-20 grid size-5 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/55 opacity-0 transition hover:bg-muted/30 hover:text-foreground group-hover/agent-rail:opacity-100"
-        onClick={() => setCollapsed(true)}
+        aria-label="Hide agent profiles"
+        className="pointer-events-auto absolute right-2 top-1/2 z-20 grid size-5 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/55 opacity-0 transition hover:bg-muted/30 hover:text-foreground group-hover/agent-rail:opacity-100"
+        onClick={onClose}
         onPointerDown={event => event.stopPropagation()}
-        title="Collapse agent profiles"
+        title="Hide agent profiles"
         type="button"
       >
-        <Codicon aria-hidden="true" name="chevron-down" size="0.78rem" />
+        <Codicon aria-hidden="true" name="close" size="0.78rem" />
       </button>
       <div className="relative min-w-0 overflow-hidden">
         <div
@@ -197,6 +173,19 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
   )
 }
 
+export function StudioActiveProfileButton({ onClick }: { onClick?: () => void }) {
+  const profiles = useStore($profiles)
+  const activeProfile = normalizeProfileKey(useStore($activeGatewayProfile))
+  const colors = useStore($profileColors)
+  const active = profiles.find(profile => normalizeProfileKey(profile.name) === activeProfile) ?? profiles.find(profile => profile.is_default) ?? null
+
+  if (!profiles.length || !active) {
+    return null
+  }
+
+  return <AgentProfileRailButton active compact color={resolveProfileColor(active.name, colors)} onSelect={onClick} profile={active} />
+}
+
 function distributeProfilesAroundActive(profiles: ProfileInfo[], activeIndex: number) {
   const left: ProfileInfo[] = []
   const right: ProfileInfo[] = []
@@ -225,11 +214,13 @@ function orderProfilesForComposer(profiles: ProfileInfo[], order: string[]): Pro
 
 function AgentProfileRailButton({
   active,
+  compact,
   color,
   onSelect,
   profile
 }: {
   active: boolean
+  compact?: boolean
   color: null | string
   onSelect?: () => void
   profile: ProfileInfo
@@ -243,7 +234,7 @@ function AgentProfileRailButton({
       className={cn(
         'group/profile relative flex h-7 shrink-0 items-center justify-center rounded-[8px] border border-transparent text-xs transition-all duration-150',
         active
-          ? 'pointer-events-auto min-w-0 max-w-42 gap-2 bg-primary/[0.06] px-2 text-foreground shadow-sm hover:bg-primary/10'
+          ? cn('pointer-events-auto min-w-0 gap-2 bg-primary/[0.06] text-foreground shadow-sm hover:bg-primary/10', compact ? 'size-7 px-0' : 'max-w-42 px-2')
           : 'pointer-events-auto size-6 text-muted-foreground/70 opacity-65 hover:bg-muted/30 hover:text-foreground hover:opacity-100'
       )}
       onClick={event => {
@@ -261,7 +252,7 @@ function AgentProfileRailButton({
         ) : (
           <ProfileInitial color={color} name={profile.name} />
         )}
-        {active && <span className="min-w-0 truncate">{profile.name}</span>}
+        {active && !compact && <span className="min-w-0 truncate">{profile.name}</span>}
       </span>
       {!active && !profile.is_default && (
         <span

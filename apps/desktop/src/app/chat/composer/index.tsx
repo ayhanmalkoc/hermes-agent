@@ -10,7 +10,7 @@ import {
 } from 'react'
 
 import { StudioGoalButton } from '@/app/studio/composer-goal-button'
-import { AgentProfileRail, StudioTeamButton } from '@/app/studio/composer-team-button'
+import { AgentProfileRail, StudioActiveProfileButton, StudioTeamButton } from '@/app/studio/composer-team-button'
 import { composerFill, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
@@ -99,6 +99,7 @@ export function ChatBar({
   const attachments = useStore($composerAttachments)
   const scrolledUp = useStore($threadScrolledUp)
   const autoSpeak = useStore($autoSpeakReplies)
+  const [agentRailOpen, setAgentRailOpen] = useState(true)
   // The turn is parked on the user (clarify / approval / sudo / secret). Esc must
   // not interrupt it — there's nothing actively running to stop, and stopping
   // would discard a question the user may want to come back to. The blocking
@@ -697,6 +698,7 @@ export function ChatBar({
 
   const studioSelector = (
     <div className="flex w-fit items-center gap-1.5 pl-1">
+      <StudioActiveProfileButton onClick={() => setAgentRailOpen(open => !open)} />
       <StudioTeamButton gateway={gateway} sessionId={sessionId} storedSessionId={storedSessionId} />
     </div>
   )
@@ -925,7 +927,7 @@ export function ChatBar({
                 }
                 sessionId={statusSessionId}
               />
-              <AgentProfileRail className="mx-auto mb-1" />
+              {agentRailOpen && <AgentProfileRail className="mx-auto mb-1" onClose={() => setAgentRailOpen(false)} />}
             </div>
             <div
               className={cn(
