@@ -1,5 +1,7 @@
 import { isDesktopFsRemoteMode, readDesktopFileText } from '@/lib/desktop-fs'
+import { mediaExternalUrl } from '@/lib/media'
 import type { PreviewTarget } from '@/store/preview'
+import { $connection } from '@/store/session'
 
 const HTML_EXTENSIONS = new Set(['.htm', '.html'])
 const IMAGE_EXTENSIONS = new Set(['.bmp', '.gif', '.jpeg', '.jpg', '.png', '.svg', '.webp'])
@@ -92,6 +94,40 @@ function pathToFileUrl(path: string) {
   return `file://${encoded.startsWith('/') ? encoded : `/${encoded}`}`
 }
 
+function isLocalPreviewUrl(raw: string): boolean {
+  try {
+    const url = new URL(raw)
+
+    return ['localhost', '127.0.0.1', '0.0.0.0', '[::1]'].includes(url.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
+
+function remoteGatewayUrl(raw: string): string {
+  if (!isDesktopFsRemoteMode() || !isLocalPreviewUrl(raw)) {
+    return raw
+  }
+
+  const conn = $connection.get()
+
+  if (!conn?.baseUrl) {
+    return raw
+  }
+
+  try {
+    const target = new URL(raw)
+    const gateway = new URL(conn.baseUrl)
+
+    target.protocol = gateway.protocol
+    target.hostname = gateway.hostname
+
+    return target.toString()
+  } catch {
+    return raw
+  }
+}
+
 export function localPreviewTarget(rawTarget: string, cwd?: string | null): PreviewTarget | null {
   const raw = rawTarget.trim().replace(/^`|`$/g, '')
 
@@ -100,7 +136,9 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
   }
 
   if (/^https?:\/\//i.test(raw)) {
-    return { kind: 'url', label: basename(raw), source: raw, url: raw }
+    const url = remoteGatewayUrl(raw)
+
+    return { kind: 'url', label: basename(url), source: raw, url }
   }
 
   let path = raw
@@ -121,6 +159,7 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
   const isAudio = AUDIO_EXTENSIONS.has(ext)
   const isVideo = VIDEO_EXTENSIONS.has(ext)
   const isUnsupportedBinary = UNSUPPORTED_BINARY_EXTENSIONS.has(ext)
+  const remote = isDesktopFsRemoteMode()
 
   return {
     kind: 'file',
@@ -132,8 +171,9 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
     // binary/large files when readFileText/readFileDataUrl returns metadata.
     binary: isUnsupportedBinary,
     previewKind: isUnsupportedBinary ? 'binary' : isHtml ? 'html' : isImage ? 'image' : isAudio ? 'audio' : isVideo ? 'video' : 'text',
+    renderMode: remote ? 'source' : undefined,
     source: raw,
-    url: pathToFileUrl(path)
+    url: remote ? mediaExternalUrl(path) : pathToFileUrl(path)
   }
 }
 
@@ -162,6 +202,10 @@ export async function normalizeOrLocalPreviewTarget(
   rawTarget: string,
   cwd?: string | null
 ): Promise<PreviewTarget | null> {
+  if (isDesktopFsRemoteMode() && !/^https?:\/\//i.test(rawTarget.trim())) {
+    return enrichPreviewTarget(localPreviewTarget(rawTarget, cwd))
+  }
+
   try {
     const normalized = await window.hermesDesktop?.normalizePreviewTarget?.(rawTarget, cwd || undefined)
 

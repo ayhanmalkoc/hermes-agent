@@ -1,5 +1,5 @@
 const PREVIEW_MARKDOWN_RE = /\[Preview:[^\]]+\]\((?<href>#preview[:/][^)]+)\)/gi
-const RAW_FILE_TARGET_RE = /(^|[\s`("'])(?<target>(?:file:\/\/[^\s`)'"<>]+|[A-Za-z]:[\\/][^\s`)'"<>]+|\/(?!\/)[^\s`)'"<>]+))/g
+const LOCAL_PREVIEW_URL_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])[^\s`)'"<>]*/gi
 
 export function stripPreviewTargets(text: string): string {
   return text
@@ -24,15 +24,15 @@ export function extractPreviewTargets(text: string): string[] {
     pushTarget(previewTargetFromMarkdownHref(match.groups?.href))
   }
 
-  for (const match of text.matchAll(RAW_FILE_TARGET_RE)) {
-    pushTarget(normalizeRawFilePreviewTarget(match.groups?.target))
+  for (const match of text.matchAll(LOCAL_PREVIEW_URL_RE)) {
+    pushTarget(match[0]?.replace(/[),.;:]+$/, '') || null)
   }
 
   return targets
 }
 
 export function mayContainPreviewTarget(text: string): boolean {
-  return /#preview[:/]|file:\/\/|(^|[\s`("'])(?:[A-Za-z]:[\\/]|\/(?!\/))/i.test(text)
+  return /#preview[:/]|https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i.test(text)
 }
 
 export function previewMarkdownHref(target: string): string {

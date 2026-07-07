@@ -10,10 +10,11 @@ export function looksLikePath(value: string): boolean {
 }
 
 export function isPreviewableTarget(target: string): boolean {
+  const fileLike = /^(?:file:\/\/|\/|\.{1,2}\/|~\/).+\.(?:html?|png|jpe?g|gif|webp|svg|mp4|webm|mov|mp3|wav|ogg)$/i
+
   return Boolean(
     target &&
-    (/^file:\/\//i.test(target) ||
-      /^(?:\/|\.{1,2}\/|~\/).+\.html?$/i.test(target) ||
+    (fileLike.test(target) ||
       /^https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i.test(target))
   )
 }
