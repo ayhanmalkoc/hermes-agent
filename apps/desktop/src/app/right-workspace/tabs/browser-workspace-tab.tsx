@@ -19,12 +19,18 @@ function normalizeHttpUrl(value: string): string | null {
   }
 }
 
+function normalizeBrowserTargetUrl(value: string): string | null {
+  const raw = value.trim()
+  if (/^file:\/\//i.test(raw)) return raw
+  return normalizeHttpUrl(raw)
+}
+
 export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [draftUrl, setDraftUrl] = useState(tab.url || 'https://example.com')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const currentUrl = useMemo(() => normalizeHttpUrl(tab.url || draftUrl) || 'https://example.com/', [draftUrl, tab.url])
+  const currentUrl = useMemo(() => normalizeBrowserTargetUrl(tab.url || draftUrl) || 'https://example.com/', [draftUrl, tab.url])
 
   useEffect(() => {
     setDraftUrl(tab.url || 'https://example.com')

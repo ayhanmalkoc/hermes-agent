@@ -72,7 +72,7 @@ describe('preview store', () => {
 
     expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
     expect($paneOpen(RIGHT_WORKSPACE_PANE_ID).get()).toBe(true)
-    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'preview'))
+    expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/demo.html' })
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
     expect(window.localStorage.getItem('hermes.desktop.sessionPreviews.v1')).toContain('/work/demo.html')
 
@@ -97,6 +97,7 @@ describe('preview store', () => {
 
     expect($sessionPreviewRegistry.get()['session-1']).toHaveLength(1)
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(second, 'preview'))
+    expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/second.html' })
 
     dismissPreviewTarget()
 
@@ -125,14 +126,14 @@ describe('preview store', () => {
     expect($previewTarget.get()).toBeNull()
   })
 
-  it('opens explicit file preview links in Files instead of live preview', () => {
+  it('opens explicit HTML preview links in Browser', () => {
     const target = previewTarget('/work/from-chat.html')
 
     setCurrentSessionPreviewTarget(target, 'explicit-link')
 
-    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'source'))
-    expect($previewTarget.get()).toBeNull()
-    expect(getSessionPreviewRecord('session-1')).toBeNull()
+    expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/from-chat.html' })
+    expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
+    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
   })
 
   it('keeps file tabs when a live preview opens', () => {
@@ -142,11 +143,11 @@ describe('preview store', () => {
     setCurrentSessionPreviewTarget(file, 'manual')
     setCurrentSessionPreviewTarget(live, 'tool-result')
 
-    expect($rightWorkspaceTabs.get().map(tab => tab.target)).toEqual([
-      withRenderMode(file, 'source'),
-      withRenderMode(live, 'preview')
+    expect($rightWorkspaceTabs.get()).toMatchObject([
+      { kind: 'files', target: withRenderMode(file, 'source') },
+      { kind: 'browser', url: 'file:///work/live.html' }
     ])
-    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(live, 'preview'))
+    expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/live.html' })
     expect($previewTarget.get()).toEqual(withRenderMode(live, 'preview'))
   })
 })

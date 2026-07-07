@@ -1072,6 +1072,11 @@ function normalizeBrowserWorkspaceUrl(rawUrl) {
   const raw = String(rawUrl || '').trim()
   if (!raw) throw new Error('Browser URL required')
 
+  if (/^file:/i.test(raw)) {
+    const localPath = resolveRequestedPathForIpc(raw, { purpose: 'Browser file preview' })
+    return pathToFileURL(localPath).toString()
+  }
+
   let parsed
   try {
     parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
@@ -1080,7 +1085,7 @@ function normalizeBrowserWorkspaceUrl(rawUrl) {
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only http:// and https:// URLs are supported')
+    throw new Error('Only http://, https://, and safe file preview URLs are supported')
   }
 
   return parsed.toString()

@@ -1,6 +1,6 @@
 import { atom, computed } from 'nanostores'
 
-import { openFilesWorkspaceTarget } from './right-workspace'
+import { openBrowserWorkspace, openFilesWorkspaceTarget } from './right-workspace'
 import { $activeSessionId, $selectedStoredSessionId } from './session'
 
 export interface PreviewTarget {
@@ -75,16 +75,33 @@ function isSamePreviewTarget(a: PreviewTarget | null, b: PreviewTarget | null): 
   )
 }
 
-function showLivePreviewTab(target?: PreviewTarget | null) {
-  if (target) {
-    openFilesWorkspaceTarget(previewTargetForSource(target, 'tool-result'))
+function isFileSourceOpen(source: PreviewRecordSource): boolean {
+  return source === 'file-browser' || source === 'manual'
+}
+
+function isBrowserPreviewTarget(target: PreviewTarget, source: PreviewRecordSource): boolean {
+  if (target.kind === 'url') {
+    return true
   }
+
+  return target.kind === 'file' && target.previewKind === 'html' && !isFileSourceOpen(source)
+}
+
+export function openPreviewTarget(target: PreviewTarget, source: PreviewRecordSource): void {
+  const normalized = previewTargetForSource(target, source)
+
+  if (isBrowserPreviewTarget(normalized, source)) {
+    openBrowserWorkspace(normalized.url)
+    return
+  }
+
+  openFilesWorkspaceTarget(normalized)
 }
 
 export function setPreviewTarget(target: PreviewTarget | null) {
   if (isSamePreviewTarget($previewTarget.get(), target)) {
     if (target) {
-      showLivePreviewTab(target)
+      openPreviewTarget(target, 'tool-result')
     }
 
     return
@@ -93,18 +110,8 @@ export function setPreviewTarget(target: PreviewTarget | null) {
   $previewTarget.set(target)
 
   if (target) {
-    showLivePreviewTab(target)
+    openPreviewTarget(target, 'tool-result')
   }
-}
-
-function openFilePreviewTarget(target: PreviewTarget) {
-  openFilesWorkspaceTarget(target)
-}
-
-// Manual/file-browser opens are "peeking at a file" → source view in the file
-// pane. Tool/explicit-link opens are runnable artifacts → live preview pane.
-function isFilePreviewSource(source: PreviewRecordSource): boolean {
-  return source === 'explicit-link' || source === 'file-browser' || source === 'manual'
 }
 
 function previewTargetForSource(target: PreviewTarget, source: PreviewRecordSource): PreviewTarget {
@@ -112,15 +119,15 @@ function previewTargetForSource(target: PreviewTarget, source: PreviewRecordSour
     return target
   }
 
-  return { ...target, renderMode: isFilePreviewSource(source) ? 'source' : 'preview' }
+  return { ...target, renderMode: isFileSourceOpen(source) ? 'source' : 'preview' }
 }
 
 function tryOpenFilePreview(target: PreviewTarget, source: PreviewRecordSource): boolean {
-  if (target.kind !== 'file' || !isFilePreviewSource(source)) {
+  if (target.kind !== 'file' || !isFileSourceOpen(source)) {
     return false
   }
 
-  openFilePreviewTarget(previewTargetForSource(target, source))
+  openPreviewTarget(target, source)
 
   return true
 }
@@ -291,7 +298,9 @@ export function setSessionPreviewTarget(
 
   const record = registerSessionPreview(sessionId, target, source, rawTarget)
 
-  setPreviewTarget(record?.normalized ?? previewTargetForSource(target, source))
+  const normalized = record?.normalized ?? previewTargetForSource(target, source)
+  $previewTarget.set(normalized)
+  openPreviewTarget(normalized, source)
 
   return record
 }
