@@ -190,13 +190,13 @@ function now(): number {
 
 function targetTitle(target: PreviewTarget | null | undefined): string {
   if (!target) {
-    return 'Dosya aç'
+    return 'Open file'
   }
 
   const label = target.label || target.source || target.url
   const tail = label.split(/[\\/]/).filter(Boolean).at(-1)
 
-  return tail || label || 'Dosya aç'
+  return tail || label || 'Open file'
 }
 
 function targetKey(target: PreviewTarget): string {
@@ -237,7 +237,7 @@ function defaultTitle(input: OpenRightWorkspaceTabInput): string {
   }
 
   if (input.kind === 'review') {
-    return 'İnceleme'
+    return 'Review'
   }
 
   if (input.kind === 'terminal') {
@@ -400,7 +400,7 @@ export function openFilesWorkspaceTargetFromTab(sourceTabId: string, target: Pre
 }
 
 export function openEmptyFilesWorkspace(): RightWorkspaceTab {
-  return openRightWorkspaceTab({ kind: 'files', target: null, title: 'Dosya aç' })
+  return openRightWorkspaceTab({ kind: 'files', target: null, title: 'Open file' })
 }
 
 export function openReviewWorkspace(): RightWorkspaceTab {

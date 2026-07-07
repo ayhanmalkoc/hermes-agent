@@ -101,7 +101,7 @@ function NewTabMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button aria-label="Yeni sekme" className="h-7 w-7 rounded-lg" size="icon-xs" variant="ghost">
+        <Button aria-label="New tab" className="h-7 w-7 rounded-lg" size="icon-xs" variant="ghost">
           <Codicon name="add" size="0.875rem" />
         </Button>
       </DropdownMenuTrigger>
@@ -109,7 +109,7 @@ function NewTabMenu() {
         {!reviewOpen && (
           <DropdownMenuItem onClick={() => openKind('review')}>
             <Codicon className="mr-2" name="diff" size="0.875rem" />
-            <span className="flex-1">İncele</span>
+            <span className="flex-1">Review</span>
             <span className="text-[0.68rem] text-muted-foreground">Ctrl+Shift+G</span>
           </DropdownMenuItem>
         )}
@@ -123,7 +123,7 @@ function NewTabMenu() {
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => openKind('files')}>
           <Codicon className="mr-2" name="folder-opened" size="0.875rem" />
-          <span className="flex-1">Dosyalar</span>
+            <span className="flex-1">Files</span>
           <span className="text-[0.68rem] text-muted-foreground">Ctrl+P</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
@@ -135,10 +135,10 @@ function RightWorkspaceLauncher() {
   const tabs = useStore($rightWorkspaceTabs)
   const reviewOpen = tabs.some(tab => tab.kind === 'review')
   const items: Array<{ hint?: string; icon: string; kind: RightWorkspaceTabKind; label: string }> = [
-    ...(reviewOpen ? [] : [{ hint: 'Ctrl+Shift+G', icon: 'diff', kind: 'review' as const, label: 'İncele' }]),
+    ...(reviewOpen ? [] : [{ hint: 'Ctrl+Shift+G', icon: 'diff', kind: 'review' as const, label: 'Review' }]),
     { icon: 'terminal', kind: 'terminal', label: 'Terminal' },
     { icon: 'globe', kind: 'browser', label: 'Browser' },
-    { hint: 'Ctrl+P', icon: 'folder-opened', kind: 'files', label: 'Dosyalar' }
+    { hint: 'Ctrl+P', icon: 'folder-opened', kind: 'files', label: 'Files' }
   ]
 
   return (
@@ -201,8 +201,8 @@ function RightWorkspaceHeader({ gateway }: { gateway?: HermesGateway | null }) {
         ))}
         <NewTabMenu />
       </div>
-      <Tip label={sizeMode === 'normal' ? 'Genişlet' : 'Daralt'}>
-        <Button aria-label={sizeMode === 'normal' ? 'Genişlet' : 'Daralt'} className="h-7 w-7" onClick={toggleRightWorkspaceSize} size="icon-xs" variant="ghost">
+      <Tip label={sizeMode === 'normal' ? 'Expand' : 'Collapse'}>
+        <Button aria-label={sizeMode === 'normal' ? 'Expand' : 'Collapse'} className="h-7 w-7" onClick={toggleRightWorkspaceSize} size="icon-xs" variant="ghost">
           <Codicon name={sizeMode === 'normal' ? 'screen-full' : 'screen-normal'} size="0.85rem" />
         </Button>
       </Tip>

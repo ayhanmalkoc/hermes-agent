@@ -71,8 +71,8 @@ function FilesEmptyState() {
     <div className="grid min-h-0 flex-1 place-items-center p-8 text-center">
       <div className="flex flex-col items-center gap-2 text-(--ui-text-tertiary)">
         <Codicon name="folder-opened" size="2rem" />
-        <div className="text-sm font-medium text-(--ui-text-primary)">Dosya aç</div>
-        <div className="text-xs">Çalışma alanı ağacından bir dosya seç</div>
+        <div className="text-sm font-medium text-(--ui-text-primary)">Open file</div>
+        <div className="text-xs">Select a file from the workspace tree</div>
       </div>
     </div>
   )
@@ -111,7 +111,7 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
           <input
             className="min-w-0 flex-1 bg-transparent text-xs text-(--ui-text-primary) outline-none placeholder:text-muted-foreground"
             onChange={event => updateRightWorkspaceTab(tab.id, { treeFilter: event.target.value })}
-            placeholder="Dosyaları filtrele..."
+            placeholder="Filter files..."
             value={filterText}
           />
         </div>
@@ -129,7 +129,7 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
         filterText={filterText}
         previewOnSelect
       />
-      {rootLoading && <div className="px-3 py-2 text-xs text-muted-foreground">Yükleniyor...</div>}
+      {rootLoading && <div className="px-3 py-2 text-xs text-muted-foreground">Loading...</div>}
     </div>
   )
 }
@@ -149,42 +149,42 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button aria-label="Dosya aksiyonları" disabled={!target} size="icon-xs" variant="ghost">
+            <Button aria-label="File actions" disabled={!target} size="icon-xs" variant="ghost">
               <Codicon name="ellipsis" size="0.9rem" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
             <DropdownMenuItem disabled={!target} onClick={() => target && void copyText(target.source)}>
               <Codicon className="mr-2" name="copy" size="0.875rem" />
-              Yolu kopyala
+              Copy path
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!target} onClick={() => target && void copyFileContent(target.source)}>
               <Codicon className="mr-2" name="copy" size="0.875rem" />
-              Dosya içeriğini kopyala
+              Copy file content
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!target} onClick={() => target && void revealFile(target.source)}>
               <Codicon className="mr-2" name="go-to-file" size="0.875rem" />
-              Dosyayı göster
+              Reveal file
             </DropdownMenuItem>
             {showRichPreviewToggle && (
               <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { richPreviewEnabled: !tab.richPreviewEnabled })}>
                 <Codicon className="mr-2" name="code" size="0.875rem" />
-                {tab.richPreviewEnabled ? 'Zengin görünümü devre dışı bırak' : 'Zengin görünümü etkinleştir'}
+                {tab.richPreviewEnabled ? 'Disable rich view' : 'Enable rich view'}
               </DropdownMenuItem>
             )}
             {showWordWrapToggle && (
               <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { wordWrapEnabled: !tab.wordWrapEnabled })}>
                 <Codicon className="mr-2" name="word-wrap" size="0.875rem" />
-                {tab.wordWrapEnabled ?? true ? 'Satır kaydırmayı devre dışı bırak' : 'Satır kaydırmayı etkinleştir'}
+                {tab.wordWrapEnabled ?? true ? 'Disable word wrap' : 'Enable word wrap'}
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
         <Button disabled={!target} onClick={() => target && void revealFile(target.source)} size="xs" variant="secondary">
-          Göster
+          Reveal
         </Button>
-        <Tip label={tab.treeVisible ? 'Dosyaları gizle' : 'Dosyaları göster'}>
-          <Button aria-label={tab.treeVisible ? 'Dosyaları gizle' : 'Dosyaları göster'} onClick={() => toggleRightWorkspaceTabTree(tab.id)} size="icon-xs" variant="ghost">
+        <Tip label={tab.treeVisible ? 'Hide files' : 'Show files'}>
+          <Button aria-label={tab.treeVisible ? 'Hide files' : 'Show files'} onClick={() => toggleRightWorkspaceTabTree(tab.id)} size="icon-xs" variant="ghost">
             <Codicon name="files" size="0.9rem" />
           </Button>
         </Tip>
