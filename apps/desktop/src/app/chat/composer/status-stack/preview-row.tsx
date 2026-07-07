@@ -8,11 +8,11 @@ import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { cn } from '@/lib/utils'
-import { PREVIEW_PANE_ID } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import { $paneOpen } from '@/store/panes'
 import { $previewTarget, dismissPreviewTarget, setCurrentSessionPreviewTarget } from '@/store/preview'
 import { type PreviewArtifact } from '@/store/preview-status'
+import { $activeRightWorkspaceTab, RIGHT_WORKSPACE_PANE_ID } from '@/store/right-workspace'
 
 interface PreviewStatusRowProps {
   item: PreviewArtifact
@@ -23,9 +23,10 @@ interface PreviewStatusRowProps {
 export const PreviewStatusRow = memo(function PreviewStatusRow({ item, onDismiss }: PreviewStatusRowProps) {
   const { t } = useI18n()
   const activePreview = useStore($previewTarget)
-  const previewPaneOpen = useStore($paneOpen(PREVIEW_PANE_ID))
+  const activeWorkspaceTab = useStore($activeRightWorkspaceTab)
+  const previewPaneOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const [opening, setOpening] = useState(false)
-  const isOpen = activePreview?.source === item.target && previewPaneOpen
+  const isOpen = activePreview?.source === item.target && activeWorkspaceTab?.target?.source === item.target && previewPaneOpen
 
   const resolveTarget = async () => {
     const target = await normalizeOrLocalPreviewTarget(item.target, item.cwd || undefined)

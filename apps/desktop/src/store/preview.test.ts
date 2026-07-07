@@ -1,16 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-import { $rightRailActiveTabId, PREVIEW_PANE_ID, RIGHT_RAIL_PREVIEW_TAB_ID } from './layout'
 import { $paneOpen } from './panes'
 import {
-  $filePreviewTabs,
   $previewServerRestart,
   $previewServerRestartStatus,
   $previewTarget,
   $sessionPreviewRegistry,
   beginPreviewServerRestart,
   clearSessionPreviewRegistry,
-  closeActiveRightRailTab,
   dismissPreviewTarget,
   getSessionPreviewRecord,
   type PreviewTarget,
@@ -42,7 +39,6 @@ describe('preview store', () => {
     $selectedStoredSessionId.set(null)
     window.localStorage.clear()
     clearSessionPreviewRegistry()
-    $filePreviewTabs.set([])
     $rightWorkspaceTabs.set([])
     $activeRightWorkspaceTabId.set(null)
   })
@@ -53,7 +49,6 @@ describe('preview store', () => {
     $selectedStoredSessionId.set(null)
     window.localStorage.clear()
     clearSessionPreviewRegistry()
-    $filePreviewTabs.set([])
     $rightWorkspaceTabs.set([])
     $activeRightWorkspaceTabId.set(null)
   })
@@ -76,7 +71,6 @@ describe('preview store', () => {
     setCurrentSessionPreviewTarget(target, 'tool-result')
 
     expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
-    expect($paneOpen(PREVIEW_PANE_ID).get()).toBe(true)
     expect($paneOpen(RIGHT_WORKSPACE_PANE_ID).get()).toBe(true)
     expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'preview'))
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
@@ -85,7 +79,7 @@ describe('preview store', () => {
     dismissPreviewTarget()
 
     expect($previewTarget.get()).toBeNull()
-    expect($paneOpen(PREVIEW_PANE_ID).get()).toBe(false)
+    expect($paneOpen(RIGHT_WORKSPACE_PANE_ID).get()).toBe(true)
     expect(getSessionPreviewRecord('session-1')).toBeNull()
     expect($sessionPreviewRegistry.get()['session-1']?.[0]?.dismissedAt).toEqual(expect.any(Number))
 
@@ -125,7 +119,7 @@ describe('preview store', () => {
     expect($previewTarget.get()).toEqual(withRenderMode(preview, 'preview'))
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(preview, 'preview'))
 
-    closeActiveRightRailTab()
+    dismissPreviewTarget()
 
     expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'source'))
     expect($previewTarget.get()).toBeNull()
@@ -148,9 +142,11 @@ describe('preview store', () => {
     setCurrentSessionPreviewTarget(file, 'manual')
     setCurrentSessionPreviewTarget(live, 'tool-result')
 
-    expect($filePreviewTabs.get().map(tab => tab.target)).toEqual([withRenderMode(file, 'source')])
+    expect($rightWorkspaceTabs.get().map(tab => tab.target)).toEqual([
+      withRenderMode(file, 'source'),
+      withRenderMode(live, 'preview')
+    ])
     expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(live, 'preview'))
-    expect($rightRailActiveTabId.get()).toBe(RIGHT_RAIL_PREVIEW_TAB_ID)
     expect($previewTarget.get()).toEqual(withRenderMode(live, 'preview'))
   })
 })
