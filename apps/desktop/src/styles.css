@@ -816,6 +816,16 @@ text-* variant utilities. */ .btn-arc {
   border-color: var(--dt-destructive);
 }
 
+.studio-team-trigger.desktop-input-chrome,
+.studio-team-trigger.desktop-input-chrome:hover,
+.studio-team-trigger.desktop-input-chrome:focus,
+.studio-team-trigger.desktop-input-chrome:focus-visible,
+.studio-team-trigger.desktop-input-chrome[data-state='open'] {
+  border-color: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
 @layer components {
   .scrollbar-dt,
   .scrollbar-dt * {

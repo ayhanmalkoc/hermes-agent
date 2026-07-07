@@ -70,7 +70,7 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
       <SelectTrigger
         aria-label="Team"
         className={cn(
-          'group relative h-7 w-auto px-2 text-xs transition-colors focus:border-transparent focus:shadow-none focus-visible:border-transparent focus-visible:shadow-none data-[state=open]:border-transparent data-[state=open]:shadow-none',
+          'studio-team-trigger group relative h-7 w-auto px-2 text-xs transition-colors',
           hasTeamValue
             ? 'rounded-[8px] border-transparent bg-primary/[0.06] hover:bg-primary/10 data-[state=open]:bg-primary/10'
             : 'rounded-[8px] border-transparent bg-muted/20 hover:bg-muted/30 data-[state=open]:bg-muted/30',
