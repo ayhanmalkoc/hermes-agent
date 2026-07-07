@@ -128,6 +128,29 @@ function remoteGatewayUrl(raw: string): string {
   }
 }
 
+async function remoteGatewayPreviewProxyUrl(raw: string): Promise<string | null> {
+  if (!isDesktopFsRemoteMode() || !isLocalPreviewUrl(raw)) {
+    return null
+  }
+
+  try {
+    const result = await window.hermesDesktop?.api<{ url: string }>({
+      body: { url: raw },
+      method: 'POST',
+      path: '/api/preview/tickets'
+    })
+    const baseUrl = $connection.get()?.baseUrl
+
+    if (!result?.url || !baseUrl) {
+      return null
+    }
+
+    return new URL(result.url, baseUrl).toString()
+  } catch {
+    return null
+  }
+}
+
 export function localPreviewTarget(rawTarget: string, cwd?: string | null): PreviewTarget | null {
   const raw = rawTarget.trim().replace(/^`|`$/g, '')
 
@@ -202,6 +225,16 @@ export async function normalizeOrLocalPreviewTarget(
   rawTarget: string,
   cwd?: string | null
 ): Promise<PreviewTarget | null> {
+  const raw = rawTarget.trim()
+
+  if (/^https?:\/\//i.test(raw)) {
+    const proxied = await remoteGatewayPreviewProxyUrl(raw)
+
+    if (proxied) {
+      return { kind: 'url', label: basename(raw), source: raw, url: proxied }
+    }
+  }
+
   if (isDesktopFsRemoteMode() && !/^https?:\/\//i.test(rawTarget.trim())) {
     return enrichPreviewTarget(localPreviewTarget(rawTarget, cwd))
   }

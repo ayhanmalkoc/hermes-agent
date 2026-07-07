@@ -140,6 +140,15 @@ describe('external link helpers', () => {
     expect(link.textContent).toBe('Puerto Rico El Yunque')
   })
 
+  it('can preserve raw URL labels for assistant autolinks', () => {
+    installDesktopBridge({ fetchLinkTitle: vi.fn().mockResolvedValue('Fetched Title') })
+    const url = 'https://example.com/test-page'
+
+    render(<PrettyLink href={url} label={url} preferRawLabel />)
+
+    expect(screen.getByRole('link').textContent).toContain(url)
+  })
+
   it('ignores error-like fetched titles and falls back to slug label', async () => {
     const bridge = vi.fn().mockResolvedValue('GetYourGuide – Error')
     installDesktopBridge({ fetchLinkTitle: bridge as unknown as Window['hermesDesktop']['fetchLinkTitle'] })

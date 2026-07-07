@@ -1,22 +1,30 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $connection } from '@/store/session'
 
-import { localPreviewTarget } from './local-preview'
+import { localPreviewTarget, normalizeOrLocalPreviewTarget } from './local-preview'
 
 describe('localPreviewTarget', () => {
   beforeEach(() => {
     $connection.set({ mode: 'local' } as never)
+    vi.restoreAllMocks()
   })
 
   it('keeps localhost URLs local in local mode', () => {
     expect(localPreviewTarget('http://localhost:5173/demo')?.url).toBe('http://localhost:5173/demo')
   })
 
-  it('rewrites localhost URLs to the remote gateway host', () => {
+  it('uses fresh gateway preview tickets for remote localhost URLs', async () => {
     $connection.set({ mode: 'remote', baseUrl: 'https://100.107.234.45:9119', token: 't' } as never)
+    vi.stubGlobal('window', {
+      hermesDesktop: {
+        api: vi.fn(async () => ({ url: '/api/preview/open/ticket/demo' }))
+      }
+    })
 
-    expect(localPreviewTarget('http://localhost:5173/demo')?.url).toBe('https://100.107.234.45:5173/demo')
+    expect((await normalizeOrLocalPreviewTarget('http://localhost:5173/demo'))?.url).toBe(
+      'https://100.107.234.45:9119/api/preview/open/ticket/demo'
+    )
   })
 
   it('does not leak remote file previews as local file URLs', () => {

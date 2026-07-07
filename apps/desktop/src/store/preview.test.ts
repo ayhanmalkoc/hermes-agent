@@ -18,7 +18,7 @@ import {
   setCurrentSessionPreviewTarget
 } from './preview'
 import { $activeSessionId, $selectedStoredSessionId } from './session'
-import { $activeRightWorkspaceTab, $activeRightWorkspaceTabId, $rightWorkspaceTabs } from './right-workspace'
+import { $activeRightWorkspaceTab, $activeRightWorkspaceTabId, $rightWorkspaceTabs, RIGHT_WORKSPACE_PANE_ID } from './right-workspace'
 
 function previewTarget(source: string): PreviewTarget {
   return {
@@ -77,6 +77,8 @@ describe('preview store', () => {
 
     expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
     expect($paneOpen(PREVIEW_PANE_ID).get()).toBe(true)
+    expect($paneOpen(RIGHT_WORKSPACE_PANE_ID).get()).toBe(true)
+    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'preview'))
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
     expect(window.localStorage.getItem('hermes.desktop.sessionPreviews.v1')).toContain('/work/demo.html')
 
@@ -147,10 +149,8 @@ describe('preview store', () => {
     setCurrentSessionPreviewTarget(live, 'tool-result')
 
     expect($filePreviewTabs.get().map(tab => tab.target)).toEqual([withRenderMode(file, 'source')])
-    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(file, 'source'))
+    expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(live, 'preview'))
     expect($rightRailActiveTabId.get()).toBe(RIGHT_RAIL_PREVIEW_TAB_ID)
     expect($previewTarget.get()).toEqual(withRenderMode(live, 'preview'))
   })
 })
-
-

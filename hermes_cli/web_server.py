@@ -33,10 +33,10 @@ import threading
 import time
 import urllib.error
 import urllib.parse
+import urllib.request
 import zipfile
 
 from hermes_cli._subprocess_compat import windows_detach_flags, windows_hide_flags
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -573,6 +573,8 @@ async def auth_middleware(request: Request, call_next):
     if getattr(request.app.state, "auth_required", False):
         return await call_next(request)
     path = request.url.path
+    if path.startswith("/api/preview/open/"):
+        return await call_next(request)
     if path.startswith("/api/") and path not in _PUBLIC_API_PATHS:
         if not _has_valid_session_token(request) and not _has_valid_query_token(request, path):
             return JSONResponse(
@@ -1157,6 +1159,74 @@ _MEDIA_CONTENT_TYPES = {
     ".ico": "image/x-icon",
 }
 _MEDIA_MAX_BYTES = 25 * 1024 * 1024
+_PREVIEW_PROXY_TTL_SECONDS = 120
+_PREVIEW_PROXY_MAX_BYTES = 25 * 1024 * 1024
+_PREVIEW_PROXY_TICKETS: dict[str, dict[str, Any]] = {}
+
+
+class PreviewProxyTicketRequest(BaseModel):
+    url: str
+
+
+def _preview_proxy_target(raw_url: str) -> urllib.parse.ParseResult:
+    parsed = urllib.parse.urlparse(str(raw_url or "").strip())
+    if parsed.scheme not in {"http", "https"}:
+        raise HTTPException(status_code=400, detail="Unsupported preview URL")
+    if parsed.hostname not in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
+        raise HTTPException(status_code=400, detail="Preview proxy only supports loopback URLs")
+    if not parsed.port:
+        raise HTTPException(status_code=400, detail="Preview URL must include a port")
+    host = "127.0.0.1" if parsed.hostname in {"localhost", "0.0.0.0"} else parsed.hostname
+    netloc_host = f"[{host}]" if host == "::1" else host
+    return parsed._replace(netloc=f"{netloc_host}:{parsed.port}")
+
+
+def _preview_proxy_sweep(now: float | None = None) -> None:
+    current = time.time() if now is None else now
+    expired = [ticket for ticket, data in _PREVIEW_PROXY_TICKETS.items() if float(data.get("expires_at", 0)) <= current]
+    for ticket in expired:
+        _PREVIEW_PROXY_TICKETS.pop(ticket, None)
+
+
+def _preview_proxy_fetch(url: str) -> tuple[bytes, str, int]:
+    req = urllib.request.Request(url, headers={"User-Agent": "Hermes-Preview-Proxy"})
+    with urllib.request.urlopen(req, timeout=10) as response:
+        status = int(getattr(response, "status", 200))
+        content_type = response.headers.get("content-type", "application/octet-stream")
+        body = response.read(_PREVIEW_PROXY_MAX_BYTES + 1)
+    if len(body) > _PREVIEW_PROXY_MAX_BYTES:
+        raise HTTPException(status_code=413, detail="Preview response too large")
+    return body, content_type, status
+
+
+@app.post("/api/preview/tickets")
+async def create_preview_proxy_ticket(payload: PreviewProxyTicketRequest, request: Request):
+    _require_token(request)
+    parsed = _preview_proxy_target(payload.url)
+    ticket = secrets.token_urlsafe(24)
+    _preview_proxy_sweep()
+    _PREVIEW_PROXY_TICKETS[ticket] = {
+        "expires_at": time.time() + _PREVIEW_PROXY_TTL_SECONDS,
+        "target": urllib.parse.urlunparse(parsed),
+    }
+    path = parsed.path.lstrip("/")
+    if parsed.query:
+        path = f"{path}?{parsed.query}"
+    return {"url": f"/api/preview/open/{ticket}/{path}", "expires_in": _PREVIEW_PROXY_TTL_SECONDS}
+
+
+@app.get("/api/preview/open/{ticket}/{path:path}")
+async def open_preview_proxy(ticket: str, path: str, request: Request):
+    _preview_proxy_sweep()
+    data = _PREVIEW_PROXY_TICKETS.get(ticket)
+    if not data:
+        raise HTTPException(status_code=404, detail="Preview ticket expired")
+    base = urllib.parse.urlparse(str(data["target"]))
+    requested_path = "/" + path
+    query = request.url.query
+    url = urllib.parse.urlunparse(base._replace(path=requested_path, query=query))
+    body, content_type, status = await asyncio.to_thread(_preview_proxy_fetch, url)
+    return Response(content=body, status_code=status, media_type=content_type)
 _MANAGED_FILES_ROOT_ENV = "HERMES_DASHBOARD_FILES_ROOT"
 _MANAGED_FILE_MAX_BYTES = 100 * 1024 * 1024
 _HOSTED_MANAGED_FILES_ROOT = Path("/opt/data")

@@ -249,12 +249,14 @@ interface PrettyLinkProps extends Omit<ComponentProps<'a'>, 'href' | 'target'> {
   href: string
   label?: string
   fallbackLabel?: string
+  preferRawLabel?: boolean
 }
 
-export function PrettyLink({ className, fallbackLabel, href, label, ...rest }: PrettyLinkProps) {
+export function PrettyLink({ className, fallbackLabel, href, label, preferRawLabel = false, ...rest }: PrettyLinkProps) {
   const target = useMemo(() => normalizeExternalUrl(href), [href])
-  const fetched = useLinkTitle(label ? null : target)
-  const display = fetched || label?.trim() || fallbackLabel?.trim() || urlSlugTitleLabel(target)
+  const rawLabel = preferRawLabel ? label?.trim() || fallbackLabel?.trim() || href.trim() : ''
+  const fetched = useLinkTitle(label || rawLabel ? null : target)
+  const display = rawLabel || fetched || label?.trim() || fallbackLabel?.trim() || urlSlugTitleLabel(target)
 
   return (
     <ExternalLink className={cn('wrap-break-word', className)} href={target} title={target} {...rest}>

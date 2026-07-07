@@ -119,7 +119,11 @@ function isSamePreviewTarget(a: PreviewTarget | null, b: PreviewTarget | null): 
   )
 }
 
-function showLivePreviewTab() {
+function showLivePreviewTab(target?: PreviewTarget | null) {
+  if (target) {
+    openFilesWorkspaceTarget(previewTargetForSource(target, 'tool-result'))
+  }
+
   setPaneOpen(PREVIEW_PANE_ID, true)
   selectRightRailTab(RIGHT_RAIL_PREVIEW_TAB_ID)
 }
@@ -127,7 +131,7 @@ function showLivePreviewTab() {
 export function setPreviewTarget(target: PreviewTarget | null) {
   if (isSamePreviewTarget($previewTarget.get(), target)) {
     if (target) {
-      showLivePreviewTab()
+      showLivePreviewTab(target)
     }
 
     return
@@ -136,7 +140,7 @@ export function setPreviewTarget(target: PreviewTarget | null) {
   $previewTarget.set(target)
 
   if (target) {
-    showLivePreviewTab()
+    showLivePreviewTab(target)
   }
 }
 

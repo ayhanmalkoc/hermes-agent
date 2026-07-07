@@ -283,10 +283,18 @@ function MarkdownLink({ children, className, href, ...props }: ComponentProps<'a
     }
   }
 
-  const fallbackLabel = text && normalizeExternalUrl(text) !== target ? text : undefined
+  const rawAutolink = Boolean(text && normalizeExternalUrl(text) === target)
+  const fallbackLabel = text && !rawAutolink ? text : undefined
 
   return (
-    <PrettyLink className={cn('wrap-anywhere', className)} fallbackLabel={fallbackLabel} href={target} {...props} />
+    <PrettyLink
+      className={cn('wrap-anywhere', className)}
+      fallbackLabel={fallbackLabel}
+      href={target}
+      label={rawAutolink ? text : undefined}
+      preferRawLabel={rawAutolink}
+      {...props}
+    />
   )
 }
 
