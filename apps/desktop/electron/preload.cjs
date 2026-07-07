@@ -70,7 +70,6 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   setTranslucency: payload => ipcRenderer.send('hermes:translucency', payload),
   setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
-  openPreviewInBrowser: url => ipcRenderer.invoke('hermes:openPreviewInBrowser', url),
   browser: {
     back: id => ipcRenderer.invoke('hermes:browser:back', id),
     forward: id => ipcRenderer.invoke('hermes:browser:forward', id),

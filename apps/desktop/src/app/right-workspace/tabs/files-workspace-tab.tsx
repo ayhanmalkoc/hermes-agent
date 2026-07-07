@@ -1,6 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { PreviewPane } from '@/app/chat/right-rail/preview-pane'
+import { LocalFilePreview } from '@/app/chat/right-rail/preview-file'
 import { readDesktopFileText } from '@/lib/desktop-fs'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
@@ -192,9 +192,9 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <div className={cn('min-w-0 flex-1 overflow-hidden', !target && 'flex')}>
           {target ? (
-            <PreviewPane
-              embedded
+            <LocalFilePreview
               filesMode
+              reloadKey={0}
               richPreviewEnabled={showRichPreviewToggle ? (tab.richPreviewEnabled ?? true) : true}
               target={target}
               wordWrapEnabled={tab.wordWrapEnabled ?? true}

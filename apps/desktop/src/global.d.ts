@@ -81,7 +81,6 @@ declare global {
       setTranslucency?: (payload: { intensity: number }) => void
       setPreviewShortcutActive?: (active: boolean) => void
       openExternal: (url: string) => Promise<void>
-      openPreviewInBrowser?: (url: string) => Promise<void>
       browser: {
         back: (id: string) => Promise<{ ok: boolean }>
         forward: (id: string) => Promise<{ ok: boolean }>
