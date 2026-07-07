@@ -99,7 +99,7 @@ export function ChatBar({
   const attachments = useStore($composerAttachments)
   const scrolledUp = useStore($threadScrolledUp)
   const autoSpeak = useStore($autoSpeakReplies)
-  const [agentRailOpen, setAgentRailOpen] = useState(true)
+  const [agentRailOpen, setAgentRailOpen] = useState(false)
   // The turn is parked on the user (clarify / approval / sudo / secret). Esc must
   // not interrupt it — there's nothing actively running to stop, and stopping
   // would discard a question the user may want to come back to. The blocking
