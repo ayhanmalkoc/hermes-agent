@@ -103,9 +103,10 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
 interface AgentProfileRailProps {
   className?: string
   onClose?: () => void
+  open?: boolean
 }
 
-export function AgentProfileRail({ className, onClose }: AgentProfileRailProps) {
+export function AgentProfileRail({ className, onClose, open = true }: AgentProfileRailProps) {
   const profiles = useStore($profiles)
   const activeProfile = normalizeProfileKey(useStore($activeGatewayProfile))
   const order = useStore($profileOrder)
@@ -123,7 +124,14 @@ export function AgentProfileRail({ className, onClose }: AgentProfileRailProps) 
   }
 
   return (
-    <div className={cn('group/agent-rail pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8', className)}>
+    <div
+      className={cn(
+        'group/agent-rail pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8 transition-all duration-180 ease-out',
+        open ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.98] opacity-0',
+        className
+      )}
+      inert={!open}
+    >
       <button
         aria-label="Hide agent profiles"
         className="pointer-events-auto absolute right-2 top-1/2 z-20 grid size-5 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/55 opacity-0 transition hover:bg-muted/30 hover:text-foreground group-hover/agent-rail:opacity-100"

@@ -221,10 +221,10 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
 
   return (
     <div
-      // Sits in the overlay lane above the composer. The composer root has pt-2
-      // before the actual surface; translate by that amount so the stack returns
-      // to its original attachment point without intruding into the repo strip.
-      className="absolute inset-x-0 bottom-full z-3 max-h-[40vh] translate-y-2 overflow-y-auto"
+      // Sits in the overlay lane above the composer/top chrome and uses the
+      // same x/width as the composer surface so preview/status cards align with
+      // the input instead of floating inset from it.
+      className="absolute inset-x-0 bottom-full z-3 max-h-[40vh] overflow-y-auto"
       onPointerDownCapture={() => blurComposerInput()}
       ref={stackRef}
     >
@@ -237,9 +237,7 @@ export function ComposerStatusStack({ queue, sessionId }: ComposerStatusStackPro
       <div
         className={cn(
           composerDockCard('top'),
-          // Inset (mx-2) so the stack reads slightly narrower than the composer
-          // surface below it — the original look.
-          'mx-2 overflow-hidden rounded-b-none border-b border-b-transparent pt-0.5',
+          'overflow-hidden rounded-b-none border-b border-b-transparent pt-0.5',
           'transition-opacity duration-200 ease-out',
           scrolledUp ? 'opacity-30 group-hover/composer:opacity-100' : 'opacity-100'
         )}

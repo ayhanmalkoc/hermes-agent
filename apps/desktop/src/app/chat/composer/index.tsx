@@ -927,7 +927,7 @@ export function ChatBar({
                 }
                 sessionId={statusSessionId}
               />
-              {agentRailOpen && <AgentProfileRail className="mx-auto mb-1" onClose={() => setAgentRailOpen(false)} />}
+              <AgentProfileRail className="mx-auto mb-1" onClose={() => setAgentRailOpen(false)} open={agentRailOpen} />
             </div>
             <div
               className={cn(
