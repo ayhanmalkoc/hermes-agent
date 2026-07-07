@@ -4,6 +4,7 @@ import {
   $activeRightWorkspaceTabId,
   $rightWorkspaceSizeMode,
   $rightWorkspaceTabs,
+  openBrowserWorkspace,
   openReviewWorkspace,
   openTerminalWorkspaceForTerminal,
   pruneRightWorkspaceTerminalTabs,
@@ -59,5 +60,14 @@ describe('right workspace session scope', () => {
 
     expect($rightWorkspaceTabs.get()).toMatchObject([{ id: 'terminal:live-term', terminalId: 'live-term' }])
     expect($activeRightWorkspaceTabId.get()).toBe('terminal:live-term')
+  })
+
+  it('opens browser tabs as right workspace tabs', () => {
+    openBrowserWorkspace('https://example.com/demo')
+
+    expect($rightWorkspaceTabs.get()).toMatchObject([
+      { id: 'browser:https://example.com/demo', kind: 'browser', url: 'https://example.com/demo' }
+    ])
+    expect($activeRightWorkspaceTabId.get()).toBe('browser:https://example.com/demo')
   })
 })

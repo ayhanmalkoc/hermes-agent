@@ -1,6 +1,7 @@
 const {
   app,
   BrowserWindow,
+  WebContentsView,
   Menu,
   Notification,
   clipboard,
@@ -1063,6 +1064,95 @@ async function openPreviewInBrowser(rawUrl) {
   }
 
   return openExternalUrl(raw)
+}
+
+const browserWorkspaceViews = new Map()
+
+function normalizeBrowserWorkspaceUrl(rawUrl) {
+  const raw = String(rawUrl || '').trim()
+  if (!raw) throw new Error('Browser URL required')
+
+  let parsed
+  try {
+    parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
+  } catch {
+    throw new Error('Invalid browser URL')
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http:// and https:// URLs are supported')
+  }
+
+  return parsed.toString()
+}
+
+function ensureBrowserWorkspaceView(id) {
+  const key = String(id || '').trim()
+  if (!key) throw new Error('Browser tab id required')
+  if (!mainWindow || mainWindow.isDestroyed()) throw new Error('Main window is not available')
+
+  const existing = browserWorkspaceViews.get(key)
+  if (existing && !existing.webContents.isDestroyed()) {
+    return existing
+  }
+
+  const view = new WebContentsView({
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      partition: 'persist:hermes-browser',
+      sandbox: true
+    }
+  })
+
+  view.webContents.setWindowOpenHandler(details => {
+    openExternalUrl(details.url)
+    return { action: 'deny' }
+  })
+  view.webContents.on('will-navigate', (event, url) => {
+    try {
+      normalizeBrowserWorkspaceUrl(url)
+    } catch {
+      event.preventDefault()
+    }
+  })
+  browserWorkspaceViews.set(key, view)
+
+  return view
+}
+
+function attachBrowserWorkspaceView(id) {
+  const view = ensureBrowserWorkspaceView(id)
+  if (!view.__hermesAttached) {
+    mainWindow.contentView.addChildView(view)
+    view.__hermesAttached = true
+  }
+  return view
+}
+
+function detachBrowserWorkspaceView(id) {
+  const view = browserWorkspaceViews.get(String(id || ''))
+  if (!view || !mainWindow || mainWindow.isDestroyed()) return false
+
+  try {
+    mainWindow.contentView.removeChildView(view)
+    view.__hermesAttached = false
+  } catch {
+    // Already detached.
+  }
+
+  return true
+}
+
+function setBrowserWorkspaceBounds(id, bounds) {
+  const view = ensureBrowserWorkspaceView(id)
+  const next = {
+    height: Math.max(0, Math.round(Number(bounds?.height) || 0)),
+    width: Math.max(0, Math.round(Number(bounds?.width) || 0)),
+    x: Math.round(Number(bounds?.x) || 0),
+    y: Math.round(Number(bounds?.y) || 0)
+  }
+  view.setBounds(next)
 }
 
 function ensureWslWindowsFonts() {
@@ -5986,7 +6076,17 @@ function createWindow() {
   // The overlay rides the main window — closing the app's primary window must
   // tear it down too (otherwise it strands as an orphan that blocks
   // window-all-closed from quitting on Windows/Linux).
-  mainWindow.on('closed', () => closePetOverlay())
+  mainWindow.on('closed', () => {
+    for (const view of browserWorkspaceViews.values()) {
+      try {
+        view.webContents.close()
+      } catch {
+        // Window teardown.
+      }
+    }
+    browserWorkspaceViews.clear()
+    closePetOverlay()
+  })
 
   wireCommonWindowHandlers(mainWindow)
 
@@ -6714,6 +6814,51 @@ ipcMain.handle('hermes:openPreviewInBrowser', async (_event, url) => {
   if (!(await openPreviewInBrowser(url))) {
     throw new Error('Invalid preview URL')
   }
+})
+
+ipcMain.handle('hermes:browser:show', async (_event, id, url) => {
+  const nextUrl = normalizeBrowserWorkspaceUrl(url)
+  const view = attachBrowserWorkspaceView(id)
+  if (view.webContents.getURL() !== nextUrl) {
+    await view.webContents.loadURL(nextUrl)
+  }
+  return { ok: true, url: nextUrl }
+})
+
+ipcMain.handle('hermes:browser:hide', (_event, id) => ({ ok: detachBrowserWorkspaceView(id) }))
+
+ipcMain.handle('hermes:browser:setBounds', (_event, id, bounds) => {
+  setBrowserWorkspaceBounds(id, bounds)
+  return { ok: true }
+})
+
+ipcMain.handle('hermes:browser:load', async (_event, id, url) => {
+  const nextUrl = normalizeBrowserWorkspaceUrl(url)
+  const view = attachBrowserWorkspaceView(id)
+  await view.webContents.loadURL(nextUrl)
+  return { ok: true, url: nextUrl }
+})
+
+ipcMain.handle('hermes:browser:back', (_event, id) => {
+  const view = ensureBrowserWorkspaceView(id)
+  if (view.webContents.canGoBack()) view.webContents.goBack()
+  return { ok: true }
+})
+
+ipcMain.handle('hermes:browser:forward', (_event, id) => {
+  const view = ensureBrowserWorkspaceView(id)
+  if (view.webContents.canGoForward()) view.webContents.goForward()
+  return { ok: true }
+})
+
+ipcMain.handle('hermes:browser:reload', (_event, id) => {
+  ensureBrowserWorkspaceView(id).webContents.reload()
+  return { ok: true }
+})
+
+ipcMain.handle('hermes:browser:stop', (_event, id) => {
+  ensureBrowserWorkspaceView(id).webContents.stop()
+  return { ok: true }
 })
 
 // User-configurable default project directory. The renderer reads this on

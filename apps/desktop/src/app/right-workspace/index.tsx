@@ -18,6 +18,7 @@ import {
   $rightWorkspaceSizeMode,
   $rightWorkspaceTabs,
   closeRightWorkspaceTab,
+  openBrowserWorkspace,
   openEmptyFilesWorkspace,
   openReviewWorkspace,
   selectRightWorkspaceTab,
@@ -27,6 +28,7 @@ import {
 } from '@/store/right-workspace'
 
 import { FilesWorkspaceTab } from './tabs/files-workspace-tab'
+import { BrowserWorkspaceTab } from './tabs/browser-workspace-tab'
 import { ReviewWorkspaceTab } from './tabs/review-workspace-tab'
 import { TerminalWorkspaceTab } from './tabs/terminal-workspace-tab'
 
@@ -39,6 +41,10 @@ function iconFor(kind: RightWorkspaceTabKind): string {
     return 'terminal'
   }
 
+  if (kind === 'browser') {
+    return 'globe'
+  }
+
   return 'folder-opened'
 }
 
@@ -47,6 +53,8 @@ function openKind(kind: RightWorkspaceTabKind): void {
     openReviewWorkspace()
   } else if (kind === 'terminal') {
     createAndOpenTerminal()
+  } else if (kind === 'browser') {
+    openBrowserWorkspace()
   } else {
     openEmptyFilesWorkspace()
   }
@@ -109,6 +117,10 @@ function NewTabMenu() {
           <Codicon className="mr-2" name="terminal" size="0.875rem" />
           <span className="flex-1">Terminal</span>
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => openKind('browser')}>
+          <Codicon className="mr-2" name="globe" size="0.875rem" />
+          <span className="flex-1">Browser</span>
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => openKind('files')}>
           <Codicon className="mr-2" name="folder-opened" size="0.875rem" />
           <span className="flex-1">Dosyalar</span>
@@ -125,6 +137,7 @@ function RightWorkspaceLauncher() {
   const items: Array<{ hint?: string; icon: string; kind: RightWorkspaceTabKind; label: string }> = [
     ...(reviewOpen ? [] : [{ hint: 'Ctrl+Shift+G', icon: 'diff', kind: 'review' as const, label: 'İncele' }]),
     { icon: 'terminal', kind: 'terminal', label: 'Terminal' },
+    { icon: 'globe', kind: 'browser', label: 'Browser' },
     { hint: 'Ctrl+P', icon: 'folder-opened', kind: 'files', label: 'Dosyalar' }
   ]
 
@@ -210,6 +223,10 @@ function RightWorkspaceContent() {
 
   if (active.kind === 'terminal') {
     return <TerminalWorkspaceTab tab={active} />
+  }
+
+  if (active.kind === 'browser') {
+    return <BrowserWorkspaceTab tab={active} />
   }
 
   return <FilesWorkspaceTab tab={active} />

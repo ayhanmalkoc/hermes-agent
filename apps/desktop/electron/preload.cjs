@@ -71,6 +71,16 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   setPreviewShortcutActive: active => ipcRenderer.send('hermes:previewShortcutActive', Boolean(active)),
   openExternal: url => ipcRenderer.invoke('hermes:openExternal', url),
   openPreviewInBrowser: url => ipcRenderer.invoke('hermes:openPreviewInBrowser', url),
+  browser: {
+    back: id => ipcRenderer.invoke('hermes:browser:back', id),
+    forward: id => ipcRenderer.invoke('hermes:browser:forward', id),
+    hide: id => ipcRenderer.invoke('hermes:browser:hide', id),
+    load: (id, url) => ipcRenderer.invoke('hermes:browser:load', id, url),
+    reload: id => ipcRenderer.invoke('hermes:browser:reload', id),
+    setBounds: (id, bounds) => ipcRenderer.invoke('hermes:browser:setBounds', id, bounds),
+    show: (id, url) => ipcRenderer.invoke('hermes:browser:show', id, url),
+    stop: id => ipcRenderer.invoke('hermes:browser:stop', id)
+  },
   fetchLinkTitle: url => ipcRenderer.invoke('hermes:fetchLinkTitle', url),
   sanitizeWorkspaceCwd: cwd => ipcRenderer.invoke('hermes:workspace:sanitize', cwd),
   settings: {

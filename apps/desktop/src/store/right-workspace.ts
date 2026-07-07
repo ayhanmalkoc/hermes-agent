@@ -9,7 +9,7 @@ export const RIGHT_WORKSPACE_PANE_ID = 'right-workspace'
 
 ensurePaneRegistered(RIGHT_WORKSPACE_PANE_ID, { open: false })
 
-export type RightWorkspaceTabKind = 'files' | 'review' | 'terminal'
+export type RightWorkspaceTabKind = 'files' | 'review' | 'terminal' | 'browser'
 export type RightWorkspaceSizeMode = 'normal' | 'expanded'
 
 export interface RightWorkspaceTab {
@@ -17,6 +17,7 @@ export interface RightWorkspaceTab {
   kind: RightWorkspaceTabKind
   title: string
   terminalId?: string
+  url?: string
   target?: PreviewTarget | null
   treeVisible?: boolean
   richPreviewEnabled?: boolean
@@ -33,6 +34,7 @@ export interface OpenRightWorkspaceTabInput {
   target?: PreviewTarget | null
   terminalId?: string
   title?: string
+  url?: string
 }
 
 export const $rightWorkspaceTabs = atom<RightWorkspaceTab[]>([])
@@ -90,7 +92,7 @@ function isRightWorkspaceTab(value: unknown): value is RightWorkspaceTab {
 
   return (
     typeof record.id === 'string' &&
-    (record.kind === 'files' || record.kind === 'review' || record.kind === 'terminal') &&
+    (record.kind === 'files' || record.kind === 'review' || record.kind === 'terminal' || record.kind === 'browser') &&
     typeof record.title === 'string' &&
     typeof record.createdAt === 'number' &&
     typeof record.lastActiveAt === 'number'
@@ -222,6 +224,10 @@ function tabIdFor(input: OpenRightWorkspaceTabInput): string {
     return terminalTabId(input.terminalId)
   }
 
+  if (input.kind === 'browser' && input.url) {
+    return `browser:${input.url}`
+  }
+
   return singletonId(input.kind)
 }
 
@@ -236,6 +242,10 @@ function defaultTitle(input: OpenRightWorkspaceTabInput): string {
 
   if (input.kind === 'terminal') {
     return 'Terminal'
+  }
+
+  if (input.kind === 'browser') {
+    return input.url || 'Browser'
   }
 
   return targetTitle(input.target)
@@ -258,6 +268,7 @@ function buildRightWorkspaceTab(
     selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
     target: input.kind === 'files' ? (input.target ?? null) : undefined,
     terminalId: input.kind === 'terminal' ? input.terminalId : undefined,
+    url: input.kind === 'browser' ? (input.url ?? existing?.url ?? 'https://example.com') : undefined,
     title: defaultTitle(input),
     treeVisible: existing?.treeVisible ?? (input.kind !== 'terminal')
   }
@@ -402,6 +413,10 @@ export function openTerminalWorkspace(): RightWorkspaceTab {
 
 export function openTerminalWorkspaceForTerminal(terminalId: string, title = 'Terminal', activate = true): RightWorkspaceTab {
   return openRightWorkspaceTab({ activate, kind: 'terminal', terminalId, title })
+}
+
+export function openBrowserWorkspace(url = 'https://example.com', activate = true): RightWorkspaceTab {
+  return openRightWorkspaceTab({ activate, kind: 'browser', title: 'Browser', url })
 }
 
 export function closeActiveRightWorkspaceTab(): void {

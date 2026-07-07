@@ -82,6 +82,16 @@ declare global {
       setPreviewShortcutActive?: (active: boolean) => void
       openExternal: (url: string) => Promise<void>
       openPreviewInBrowser?: (url: string) => Promise<void>
+      browser: {
+        back: (id: string) => Promise<{ ok: boolean }>
+        forward: (id: string) => Promise<{ ok: boolean }>
+        hide: (id: string) => Promise<{ ok: boolean }>
+        load: (id: string, url: string) => Promise<{ ok: boolean; url: string }>
+        reload: (id: string) => Promise<{ ok: boolean }>
+        setBounds: (id: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<{ ok: boolean }>
+        show: (id: string, url: string) => Promise<{ ok: boolean; url: string }>
+        stop: (id: string) => Promise<{ ok: boolean }>
+      }
       fetchLinkTitle: (url: string) => Promise<string>
       sanitizeWorkspaceCwd: (cwd?: null | string) => Promise<{ cwd: string; sanitized: boolean }>
       settings: {

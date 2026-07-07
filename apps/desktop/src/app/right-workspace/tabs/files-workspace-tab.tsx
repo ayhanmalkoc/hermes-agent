@@ -47,6 +47,10 @@ async function copyFileContent(path: string): Promise<void> {
   await copyText(result.text)
 }
 
+async function revealFile(path: string): Promise<void> {
+  await window.hermesDesktop?.revealPath?.(path)
+}
+
 function isMarkdownTarget(target: RightWorkspaceTab['target']): boolean {
   if (!target) {
     return false
@@ -158,6 +162,10 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
               <Codicon className="mr-2" name="copy" size="0.875rem" />
               Dosya içeriğini kopyala
             </DropdownMenuItem>
+            <DropdownMenuItem disabled={!target} onClick={() => target && void revealFile(target.source)}>
+              <Codicon className="mr-2" name="go-to-file" size="0.875rem" />
+              Dosyayı göster
+            </DropdownMenuItem>
             {showRichPreviewToggle && (
               <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { richPreviewEnabled: !tab.richPreviewEnabled })}>
                 <Codicon className="mr-2" name="code" size="0.875rem" />
@@ -172,8 +180,8 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button disabled={!target} size="xs" variant="secondary">
-          Aç
+        <Button disabled={!target} onClick={() => target && void revealFile(target.source)} size="xs" variant="secondary">
+          Göster
         </Button>
         <Tip label={tab.treeVisible ? 'Dosyaları gizle' : 'Dosyaları göster'}>
           <Button aria-label={tab.treeVisible ? 'Dosyaları gizle' : 'Dosyaları göster'} onClick={() => toggleRightWorkspaceTabTree(tab.id)} size="icon-xs" variant="ghost">
