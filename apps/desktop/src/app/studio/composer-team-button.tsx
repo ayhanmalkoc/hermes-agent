@@ -119,71 +119,60 @@ export function AgentProfileRail({ className, onClose, open = true }: AgentProfi
   const active = ordered[activeIndex] ?? ordered.find(profile => profile.is_default) ?? null
   const { left, right } = active ? distributeProfilesAroundActive(ordered, activeIndex) : { left: [], right: [] }
 
-  if (!profiles.length || !active) {
+  if (!open || !profiles.length || !active) {
     return null
   }
 
   return (
     <div
       className={cn(
-        'grid transition-[grid-template-rows,margin,opacity] duration-180 ease-out',
-        open ? 'grid-rows-[1fr]' : 'mb-0 grid-rows-[0fr] opacity-0',
+        'group/agent-rail pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8',
         className
       )}
     >
-      <div className="min-h-0 overflow-hidden">
+      <button
+        aria-label="Hide agent profiles"
+        className="pointer-events-auto absolute right-2 top-1/2 z-20 grid size-5 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/55 opacity-0 transition hover:bg-muted/30 hover:text-foreground group-hover/agent-rail:opacity-100"
+        onClick={onClose}
+        onPointerDown={event => event.stopPropagation()}
+        title="Hide agent profiles"
+        type="button"
+      >
+        <Codicon aria-hidden="true" name="close" size="0.78rem" />
+      </button>
+      <div className="relative min-w-0 overflow-hidden">
         <div
-          className={cn(
-            'group/agent-rail pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8 transition-all duration-180 ease-out',
-            open ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-2 scale-[0.98] opacity-0'
-          )}
-          inert={!open}
-        >
-          <button
-            aria-label="Hide agent profiles"
-            className="pointer-events-auto absolute right-2 top-1/2 z-20 grid size-5 -translate-y-1/2 place-items-center rounded-md text-muted-foreground/55 opacity-0 transition hover:bg-muted/30 hover:text-foreground group-hover/agent-rail:opacity-100"
-            onClick={onClose}
-            onPointerDown={event => event.stopPropagation()}
-            title="Hide agent profiles"
-            type="button"
-          >
-            <Codicon aria-hidden="true" name="close" size="0.78rem" />
-          </button>
-          <div className="relative min-w-0 overflow-hidden">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-linear-to-r from-background/75 to-transparent"
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 left-0 z-10 w-8 bg-linear-to-r from-background/75 to-transparent"
+        />
+        <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto px-3 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {left.map(profile => (
+            <AgentProfileRailButton
+              active={false}
+              color={resolveProfileColor(profile.name, colors)}
+              key={profile.name}
+              profile={profile}
             />
-            <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto px-3 pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {left.map(profile => (
-              <AgentProfileRailButton
-                active={false}
-                color={resolveProfileColor(profile.name, colors)}
-                key={profile.name}
-                profile={profile}
-              />
-            ))}
-            </div>
-          </div>
-          <div className="flex justify-center px-1">
-            <AgentProfileRailButton active color={resolveProfileColor(active.name, colors)} profile={active} />
-          </div>
-          <div className="relative min-w-0 overflow-hidden">
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-linear-to-l from-background/75 to-transparent"
+          ))}
+        </div>
+      </div>
+      <div className="flex justify-center px-1">
+        <AgentProfileRailButton active color={resolveProfileColor(active.name, colors)} profile={active} />
+      </div>
+      <div className="relative min-w-0 overflow-hidden">
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-linear-to-l from-background/75 to-transparent"
+        />
+        <div className="flex min-w-0 items-center justify-start gap-2 overflow-x-auto px-3 pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {right.map(profile => (
+            <AgentProfileRailButton
+              active={false}
+              color={resolveProfileColor(profile.name, colors)}
+              key={profile.name}
+              profile={profile}
             />
-            <div className="flex min-w-0 items-center justify-start gap-2 overflow-x-auto px-3 pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {right.map(profile => (
-              <AgentProfileRailButton
-                active={false}
-                color={resolveProfileColor(profile.name, colors)}
-                key={profile.name}
-                profile={profile}
-              />
-            ))}
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>
