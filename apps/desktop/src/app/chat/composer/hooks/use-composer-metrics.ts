@@ -1,5 +1,5 @@
 import { useAuiState } from '@assistant-ui/react'
-import { type RefObject, useCallback, useEffect, useRef, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
 import { useMediaQuery } from '@/hooks/use-media-query'
 import { useResizeObserver } from '@/hooks/use-resize-observer'
@@ -143,9 +143,15 @@ export function useComposerMetrics({ composerRef, composerSurfaceRef, editorRef,
   // Toggling pop-out changes whether the composer reserves thread clearance.
   // The ResizeObserver may not fire (the box can keep the same box size), so
   // re-sync explicitly: docked republishes the measured height, floating zeroes
-  // it so the thread reclaims the bottom space.
-  useEffect(() => {
+  // it so the thread reclaims the bottom space. Run before paint so floating
+  // controls that read --composer-measured-height don't briefly use the CSS
+  // fallback, then repeat on rAF for late-mount chrome such as the agent rail.
+  useLayoutEffect(() => {
     syncComposerMetrics()
+
+    const raf = requestAnimationFrame(syncComposerMetrics)
+
+    return () => cancelAnimationFrame(raf)
   }, [poppedOut, syncComposerMetrics])
 
   useEffect(() => {
