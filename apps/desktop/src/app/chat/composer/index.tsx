@@ -880,30 +880,6 @@ export function ChatBar({
               onPick={replaceTriggerWithChip}
             />
           )}
-          {/* Session-scoped status stack (todos, subagents, background tasks,
-              queue). Out of flow so it never inflates the composer's measured
-              height; it overlays the chat instead of pushing it, and publishes
-              its own --status-stack-measured-height so the thread's clearance
-              accounts for it. Collapses to nothing when every status is empty. */}
-          <ComposerStatusStack
-            queue={
-              activeQueueSessionKey && queuedPrompts.length > 0 ? (
-                <QueuePanel
-                  busy={busy}
-                  editingId={queueEdit?.entryId ?? null}
-                  entries={queuedPrompts}
-                  onDelete={id => {
-                    if (removeQueuedPrompt(activeQueueSessionKey, id) && queueEdit?.entryId === id) {
-                      exitQueuedEdit('cancel')
-                    }
-                  }}
-                  onEdit={beginQueuedEdit}
-                  onSendNow={id => void sendQueuedNow(id)}
-                />
-              ) : null
-            }
-            sessionId={statusSessionId}
-          />
           {!poppedOut && (
             <div
               className="pointer-events-none absolute inset-0 rounded-[inherit]"
@@ -925,7 +901,32 @@ export function ChatBar({
             />
           )}
           <div className="relative w-full rounded-[inherit]">
-            <AgentProfileRail className="mx-auto mb-1" />
+            <div className="relative w-full" data-slot="composer-top-chrome">
+              {/* Session-scoped status stack (todos, subagents, background tasks,
+                  queue). It anchors to the top chrome so transient activity lives
+                  above the persistent active-profile rail instead of competing
+                  for the same composer-adjacent lane. */}
+              <ComposerStatusStack
+                queue={
+                  activeQueueSessionKey && queuedPrompts.length > 0 ? (
+                    <QueuePanel
+                      busy={busy}
+                      editingId={queueEdit?.entryId ?? null}
+                      entries={queuedPrompts}
+                      onDelete={id => {
+                        if (removeQueuedPrompt(activeQueueSessionKey, id) && queueEdit?.entryId === id) {
+                          exitQueuedEdit('cancel')
+                        }
+                      }}
+                      onEdit={beginQueuedEdit}
+                      onSendNow={id => void sendQueuedNow(id)}
+                    />
+                  ) : null
+                }
+                sessionId={statusSessionId}
+              />
+              <AgentProfileRail className="mx-auto mb-1" />
+            </div>
             <div
               className={cn(
                 'group/composer-surface relative z-4 isolate grid grid-rows-[auto_1fr] overflow-hidden rounded-[inherit] border border-[color-mix(in_srgb,var(--dt-composer-ring)_calc(18%*var(--composer-ring-strength)),var(--dt-input))]',
