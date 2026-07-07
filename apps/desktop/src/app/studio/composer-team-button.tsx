@@ -115,15 +115,14 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
     ordered.findIndex(profile => normalizeProfileKey(profile.name) === activeProfile)
   )
   const active = ordered[activeIndex] ?? ordered.find(profile => profile.is_default) ?? null
-  const before = ordered.slice(Math.max(0, activeIndex - 3), activeIndex)
-  const after = ordered.slice(activeIndex + 1, activeIndex + 4)
+  const { left, right } = active ? profilesAroundActive(ordered, activeIndex, 3) : { left: [], right: [] }
 
   if (!profiles.length || !active) {
     return null
   }
 
   return (
-    <div className={cn('relative flex max-w-full justify-center px-8', className)}>
+    <div className={cn('pointer-events-none relative grid w-full grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] px-8', className)}>
       <div
         aria-hidden
         className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background/70 to-transparent"
@@ -132,8 +131,8 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background/70 to-transparent"
       />
-      <div className="flex max-w-full items-center justify-center gap-1 overflow-hidden rounded-full px-1 py-0.5">
-        {before.map(profile => (
+      <div className="flex min-w-0 items-center justify-end gap-2 overflow-hidden pr-2">
+        {left.map(profile => (
           <AgentProfileRailButton
             active={false}
             color={resolveProfileColor(profile.name, colors)}
@@ -141,8 +140,12 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
             profile={profile}
           />
         ))}
+      </div>
+      <div className="flex justify-center px-1">
         <AgentProfileRailButton active color={resolveProfileColor(active.name, colors)} profile={active} />
-        {after.map(profile => (
+      </div>
+      <div className="flex min-w-0 items-center justify-start gap-2 overflow-hidden pl-2">
+        {right.map(profile => (
           <AgentProfileRailButton
             active={false}
             color={resolveProfileColor(profile.name, colors)}
@@ -153,6 +156,43 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
       </div>
     </div>
   )
+}
+
+function profilesAroundActive(profiles: ProfileInfo[], activeIndex: number, sideCount: number) {
+  const others = profiles.filter((_, index) => index !== activeIndex)
+  const left: ProfileInfo[] = []
+  const right: ProfileInfo[] = []
+
+  for (let offset = 1; offset <= sideCount; offset += 1) {
+    const before = profiles[activeIndex - offset]
+    const after = profiles[activeIndex + offset]
+
+    if (before) {
+      left.unshift(before)
+    }
+
+    if (after) {
+      right.push(after)
+    }
+  }
+
+  for (const profile of others) {
+    if (left.length >= sideCount && right.length >= sideCount) {
+      break
+    }
+
+    if (left.includes(profile) || right.includes(profile)) {
+      continue
+    }
+
+    if (left.length <= right.length && left.length < sideCount) {
+      left.unshift(profile)
+    } else if (right.length < sideCount) {
+      right.push(profile)
+    }
+  }
+
+  return { left, right }
 }
 
 function orderProfilesForComposer(profiles: ProfileInfo[], order: string[]): ProfileInfo[] {
@@ -175,10 +215,14 @@ function AgentProfileRailButton({ active, color, profile }: { active: boolean; c
       className={cn(
         'group/profile relative flex h-7 shrink-0 items-center justify-center rounded-[8px] border border-transparent text-xs transition-all duration-150',
         active
-          ? 'min-w-0 max-w-42 gap-2 bg-primary/[0.06] px-2 text-foreground shadow-sm hover:bg-primary/10'
-          : 'size-6 text-muted-foreground/70 opacity-65 hover:bg-muted/30 hover:text-foreground hover:opacity-100'
+          ? 'pointer-events-auto min-w-0 max-w-42 gap-2 bg-primary/[0.06] px-2 text-foreground shadow-sm hover:bg-primary/10'
+          : 'pointer-events-auto size-6 text-muted-foreground/70 opacity-65 hover:bg-muted/30 hover:text-foreground hover:opacity-100'
       )}
-      onClick={() => selectProfile(profile.name)}
+      onClick={event => {
+        event.stopPropagation()
+        selectProfile(profile.name)
+      }}
+      onPointerDown={event => event.stopPropagation()}
       title={profile.name}
       type="button"
     >
