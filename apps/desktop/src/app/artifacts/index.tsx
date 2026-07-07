@@ -22,7 +22,7 @@ import { Tip } from '@/components/ui/tooltip'
 import { getSessionMessages, listAllProfileSessions } from '@/hermes'
 import { type Translations, useI18n } from '@/i18n'
 import { sessionTitle } from '@/lib/chat-runtime'
-import { ExternalLink, ExternalLinkIcon, hostPathLabel, urlSlugTitleLabel, useLinkTitle } from '@/lib/external-link'
+import { ExternalLinkIcon, hostPathLabel, urlSlugTitleLabel, useLinkTitle } from '@/lib/external-link'
 import { FileImage, FileText, FolderOpen, Link2 } from '@/lib/icons'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { isRemoteGateway, mediaExternalUrl } from '@/lib/media'
@@ -381,6 +381,7 @@ function paginationItems(page: number, pageCount: number): Array<number | 'ellip
 }
 
 type CellCtx = {
+  onOpenExternal: (href: string) => void | Promise<void>
   onOpen: (artifact: ArtifactRecord) => void | Promise<void>
   onOpenChat: (sessionId: string) => void
 }
@@ -526,6 +527,14 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
     async (artifact: ArtifactRecord) => {
       try {
         if (artifact.kind === 'link') {
+          const target = await normalizeOrLocalPreviewTarget(artifact.href, artifact.cwd || undefined)
+
+          if (target) {
+            setCurrentSessionPreviewTarget(target, 'explicit-link', artifact.href)
+
+            return
+          }
+
           await openExternalArtifact(artifact.href)
 
           return
@@ -558,6 +567,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
   }, [])
 
   const cellCtx: CellCtx = {
+    onOpenExternal: openExternalArtifact,
     onOpen: openArtifact,
     onOpenChat: sessionId => navigate(sessionRoute(sessionId))
   }
@@ -795,33 +805,17 @@ function ArtifactImageCard({ artifact, failedImage, onImageError, onOpen, onOpen
   )
 }
 
-// Single click target for any row cell. External URLs render as <ExternalLink>;
-// local actions render as <button>. Padding lives here, NOT on the <td>, so
-// the entire cell area is hoverable and clickable in both branches.
+// Single click target for any row cell. Padding lives here, NOT on the <td>,
+// so the entire cell area is hoverable and clickable.
 function ArtifactCellAction({
   children,
-  href,
   onClick,
   title
 }: {
   children: React.ReactNode
-  href?: string
   onClick?: () => void
   title?: string
 }) {
-  if (href) {
-    return (
-      <ExternalLink
-        className="flex h-full w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) font-normal text-(--ui-text-secondary) no-underline underline-offset-4 decoration-current/20 transition-colors hover:text-foreground hover:underline"
-        href={href}
-        showExternalIcon={false}
-        title={title}
-      >
-        {children}
-      </ExternalLink>
-    )
-  }
-
   return (
     <RowButton
       className="flex h-full w-full min-w-0 items-center gap-2 px-2.5 py-1.5 text-left text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) font-normal text-(--ui-text-secondary) no-underline underline-offset-4 decoration-current/20 transition-colors hover:text-foreground hover:underline"
@@ -839,10 +833,9 @@ function PrimaryCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx
   const label = isLink ? fetchedTitle || urlSlugTitleLabel(artifact.href) : artifact.label
 
   return (
-    <ArtifactCellAction
-      href={isLink ? artifact.href : undefined}
-      onClick={isLink ? undefined : () => void ctx.onOpen(artifact)}
-      title={label}
+      <ArtifactCellAction
+        onClick={() => void ctx.onOpen(artifact)}
+        title={label}
     >
       <span className="mt-0.5 grid size-6 shrink-0 place-items-center self-start rounded-md bg-(--ui-bg-tertiary) text-(--ui-text-tertiary)">
         <Icon className="size-3.5" />
@@ -860,7 +853,7 @@ function PrimaryCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx
   )
 }
 
-function LocationCell({ artifact }: { artifact: ArtifactRecord; ctx: CellCtx }) {
+function LocationCell({ artifact, ctx }: { artifact: ArtifactRecord; ctx: CellCtx }) {
   const { t } = useI18n()
   const isLink = artifact.kind === 'link'
   const value = isLink ? hostPathLabel(artifact.value) : artifact.value
@@ -887,6 +880,23 @@ function LocationCell({ artifact }: { artifact: ArtifactRecord; ctx: CellCtx }) 
         text={artifact.value}
         title={copyLabel}
       />
+      {isLink && (
+        <Tip label="Open external">
+          <Button
+            aria-label="Open external"
+            className="shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/location:opacity-100"
+            onClick={event => {
+              event.stopPropagation()
+              void ctx.onOpenExternal(artifact.href)
+            }}
+            size="icon-xs"
+            type="button"
+            variant="ghost"
+          >
+            <ExternalLinkIcon />
+          </Button>
+        </Tip>
+      )}
     </div>
   )
 }

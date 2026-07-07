@@ -1,4 +1,5 @@
 from hermes_cli import web_server
+from hermes_cli.dashboard_auth.middleware import _path_is_public
 
 
 def test_preview_proxy_accepts_loopback_with_port():
@@ -26,3 +27,7 @@ def test_preview_proxy_rejects_missing_port():
         assert getattr(exc, 'status_code', None) == 400
     else:
         raise AssertionError('loopback URL without port should be rejected')
+
+
+def test_preview_proxy_open_route_bypasses_dashboard_cookie_gate():
+    assert _path_is_public('/api/preview/open/ticket/path/index.html') is True

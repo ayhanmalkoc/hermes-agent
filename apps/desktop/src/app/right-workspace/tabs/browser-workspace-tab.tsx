@@ -22,6 +22,7 @@ function normalizeHttpUrl(value: string): string | null {
 function normalizeBrowserTargetUrl(value: string): string | null {
   const raw = value.trim()
   if (/^file:\/\//i.test(raw)) return raw
+  if (/^data:text\/html[;,]/i.test(raw)) return raw
   return normalizeHttpUrl(raw)
 }
 
@@ -34,6 +35,8 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
 
   useEffect(() => {
     setDraftUrl(tab.url || 'https://example.com')
+    setError(null)
+    setLoading(false)
   }, [tab.id, tab.url])
 
   useEffect(() => {
@@ -60,8 +63,12 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       frame = window.requestAnimationFrame(syncBounds)
     }
 
+    setError(null)
     void api.show(tab.id, currentUrl).then(() => {
-      if (!disposed) scheduleBounds()
+      if (!disposed) {
+        setError(null)
+        scheduleBounds()
+      }
     }).catch(err => setError(err instanceof Error ? err.message : String(err)))
 
     const observer = new ResizeObserver(scheduleBounds)

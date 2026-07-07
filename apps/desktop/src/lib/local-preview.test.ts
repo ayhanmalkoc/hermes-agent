@@ -35,4 +35,39 @@ describe('localPreviewTarget', () => {
     expect(target?.renderMode).toBe('source')
     expect(target?.url).toBe('https://gw/api/files/download?path=%2Fvar%2Flib%2Fhermes%2Fout.html&token=t')
   })
+
+  it('turns remote HTML file previews into browser-safe data URLs', async () => {
+    $connection.set({ mode: 'remote', baseUrl: 'https://gw', token: 't' } as never)
+    vi.stubGlobal('window', {
+      hermesDesktop: {
+        api: vi.fn(async () => ({ binary: false, byteSize: 12, language: 'html', mimeType: 'text/html', text: '<h1>OK</h1>' }))
+      }
+    })
+
+    const target = await normalizeOrLocalPreviewTarget('/var/lib/hermes/out.html')
+
+    expect(target?.previewKind).toBe('html')
+    expect(target?.url).toBe('data:text/html;charset=utf-8,%3Ch1%3EOK%3C%2Fh1%3E')
+  })
+
+  it('turns local HTML file previews into browser-safe data URLs', async () => {
+    vi.stubGlobal('window', {
+      hermesDesktop: {
+        normalizePreviewTarget: vi.fn(async () => ({
+          kind: 'file',
+          label: 'out.html',
+          language: 'html',
+          path: '/tmp/out.html',
+          previewKind: 'html',
+          source: '/tmp/out.html',
+          url: 'file:///tmp/out.html'
+        })),
+        readFileText: vi.fn(async () => ({ binary: false, byteSize: 12, language: 'html', mimeType: 'text/html', text: '<h1>OK</h1>' }))
+      }
+    })
+
+    const target = await normalizeOrLocalPreviewTarget('/tmp/out.html')
+
+    expect(target?.url).toBe('data:text/html;charset=utf-8,%3Ch1%3EOK%3C%2Fh1%3E')
+  })
 })

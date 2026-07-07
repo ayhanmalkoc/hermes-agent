@@ -1050,6 +1050,10 @@ function normalizeBrowserWorkspaceUrl(rawUrl) {
     return pathToFileURL(localPath).toString()
   }
 
+  if (/^data:text\/html[;,]/i.test(raw)) {
+    return raw
+  }
+
   let parsed
   try {
     parsed = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`)
@@ -1058,7 +1062,7 @@ function normalizeBrowserWorkspaceUrl(rawUrl) {
   }
 
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new Error('Only http://, https://, and safe file preview URLs are supported')
+    throw new Error('Only http://, https://, data:text/html, and safe file preview URLs are supported')
   }
 
   return parsed.toString()

@@ -201,12 +201,20 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
 }
 
 async function enrichPreviewTarget(target: PreviewTarget | null): Promise<PreviewTarget | null> {
-  if (!isDesktopFsRemoteMode() || !target || target.kind !== 'file' || target.previewKind === 'image' || target.previewKind === 'audio' || target.previewKind === 'video') {
+  if (!target || target.kind !== 'file' || target.previewKind === 'image' || target.previewKind === 'audio' || target.previewKind === 'video') {
+    return target
+  }
+
+  if (!isDesktopFsRemoteMode() && target.previewKind !== 'html') {
     return target
   }
 
   try {
     const result = await readDesktopFileText(target.path || target.source)
+
+    const htmlDataUrl = target.previewKind === 'html' && !result.binary
+      ? `data:text/html;charset=utf-8,${encodeURIComponent(result.text)}`
+      : null
 
     return {
       ...target,
@@ -214,7 +222,8 @@ async function enrichPreviewTarget(target: PreviewTarget | null): Promise<Previe
       byteSize: result.byteSize,
       language: result.language || target.language,
       large: false,
-      mimeType: result.mimeType
+      mimeType: result.mimeType,
+      url: htmlDataUrl || target.url
     }
   } catch {
     return target
