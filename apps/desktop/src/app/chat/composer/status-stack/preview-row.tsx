@@ -26,7 +26,9 @@ export const PreviewStatusRow = memo(function PreviewStatusRow({ item, onDismiss
   const activeWorkspaceTab = useStore($activeRightWorkspaceTab)
   const previewPaneOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
   const [opening, setOpening] = useState(false)
-  const isOpen = activePreview?.source === item.target && activeWorkspaceTab?.target?.source === item.target && previewPaneOpen
+  const isOpen = activePreview?.source === item.target && previewPaneOpen && (
+    activeWorkspaceTab?.target?.source === item.target || activeWorkspaceTab?.url === activePreview.url
+  )
 
   const resolveTarget = async () => {
     const target = await normalizeOrLocalPreviewTarget(item.target, item.cwd || undefined)
@@ -60,20 +62,6 @@ export const PreviewStatusRow = memo(function PreviewStatusRow({ item, onDismiss
     }
   }
 
-  const openInBrowser = async () => {
-    try {
-      const bridge = window.hermesDesktop?.openPreviewInBrowser
-
-      if (!bridge) {
-        throw new Error('Desktop preview browser bridge is unavailable')
-      }
-
-      await bridge((await resolveTarget()).url)
-    } catch (error) {
-      notifyError(error, t.preview.unavailable)
-    }
-  }
-
   return (
     <StatusRow
       leading={
@@ -84,15 +72,7 @@ export const PreviewStatusRow = memo(function PreviewStatusRow({ item, onDismiss
           size="0.8rem"
         />
       }
-      // Plain click opens the link in the browser; ⌘/Ctrl-click opens it in the
-      // in-app preview pane instead. (isOpen still toggles the pane closed.)
-      onActivate={event => {
-        if (event.metaKey || event.ctrlKey) {
-          void togglePreview()
-        } else {
-          void openInBrowser()
-        }
-      }}
+      onActivate={() => void togglePreview()}
       trailing={
         <Tip label={t.statusStack.dismiss}>
           <Button

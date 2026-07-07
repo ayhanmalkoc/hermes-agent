@@ -126,7 +126,7 @@ export function PreviewAttachment({ source = 'manual', target }: { source?: Prev
         onClick={() => void openTarget(target)}
         type="button"
       >
-        {opening ? t.preview.opening : isActive ? t.preview.hide : t.preview.openPreview}
+        {opening ? t.preview.opening : isActive ? t.preview.hide : 'Open in Browser'}
       </button>
     </div>
   )
@@ -151,7 +151,7 @@ export function PreviewGroupAttachment({
         <MonitorPlay className="size-4" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[0.82rem] font-semibold text-foreground/90">Web preview</span>
+        <span className="block truncate text-[0.82rem] font-semibold text-foreground/90">Browser links</span>
         <span className="block truncate text-[0.7rem] text-muted-foreground">{selectedLabel}</span>
       </span>
       <DropdownMenu>
@@ -161,7 +161,7 @@ export function PreviewGroupAttachment({
             disabled={Boolean(openingTarget)}
             type="button"
           >
-            {openingTarget ? t.preview.opening : `${t.preview.openPreview} ▾`}
+            {openingTarget ? t.preview.opening : 'Open in Browser ▾'}
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
