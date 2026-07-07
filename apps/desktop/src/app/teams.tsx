@@ -141,8 +141,15 @@ export function TeamsView({ onClose }: TeamsViewProps) {
       return
     }
 
-    setSelectedId(teams[0]?.id ?? null)
+    const next = teams[0] ?? null
+    setSelectedId(next?.id ?? null)
+    setDraft(draftFromTeam(next))
   }, [selectedId, teams])
+
+  const selectTeam = (team: StudioTeam) => {
+    setSelectedId(team.id)
+    setDraft(draftFromTeam(team))
+  }
 
   const existingProfileNames = useMemo(() => new Set(profiles.map(profile => profile.name)), [profiles])
   const visibleTeams = useMemo(() => {
@@ -255,7 +262,7 @@ export function TeamsView({ onClose }: TeamsViewProps) {
                   items={[{ icon: 'trash', label: 'Delete', onSelect: () => setPendingDelete(team), tone: 'danger' }]}
                 />
               }
-              onSelect={() => setSelectedId(team.id)}
+              onSelect={() => selectTeam(team)}
               rowKey={team.id}
               title={team.name}
             />
