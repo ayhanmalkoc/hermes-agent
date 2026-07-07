@@ -18,7 +18,7 @@ import { MESSAGE_PARTS_COMPONENTS } from '@/components/assistant-ui/thread/messa
 import { StreamStallIndicator } from '@/components/assistant-ui/thread/status'
 import { formatMessageTimestamp } from '@/components/assistant-ui/thread/timestamp'
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button'
-import { PreviewAttachment } from '@/components/chat/preview-attachment'
+import { PreviewAttachment, PreviewGroupAttachment } from '@/components/chat/preview-attachment'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
@@ -104,11 +104,14 @@ export const AssistantMessage: FC<{
         {/* Todos render in the composer status stack now, not inline. */}
         <MessagePrimitive.Parts components={MESSAGE_PARTS_COMPONENTS} />
         {isRunning && <StreamStallIndicator />}
-        {previewTargets.length > 0 && (
+        {previewTargets.length === 1 && (
           <div className="mt-3 flex flex-wrap gap-2">
-            {previewTargets.map(target => (
-              <PreviewAttachment key={target} source="explicit-link" target={target} />
-            ))}
+            <PreviewAttachment source="explicit-link" target={previewTargets[0]} />
+          </div>
+        )}
+        {previewTargets.length > 1 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <PreviewGroupAttachment source="explicit-link" targets={previewTargets} />
           </div>
         )}
         <MessagePrimitive.Error>

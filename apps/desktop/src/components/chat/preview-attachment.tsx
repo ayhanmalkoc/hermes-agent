@@ -13,23 +13,30 @@ import {
   setCurrentSessionPreviewTarget
 } from '@/store/preview'
 import { $currentCwd } from '@/store/session'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
-export function PreviewAttachment({ source = 'manual', target }: { source?: PreviewRecordSource; target: string }) {
+interface PreviewOpenState {
+  openTarget: (target: string) => Promise<void>
+  openingTarget: string | null
+}
+
+function usePreviewOpen(source: PreviewRecordSource): PreviewOpenState {
   const { t } = useI18n()
   const cwd = useStore($currentCwd)
   const activePreview = useStore($previewTarget)
-  const [opening, setOpening] = useState(false)
+  const [openingTarget, setOpeningTarget] = useState<string | null>(null)
   const activePreviewRef = useRef(activePreview)
   const cwdRef = useRef(cwd)
   const mountedRef = useRef(false)
   const requestTokenRef = useRef(0)
-  const targetRef = useRef(target)
-  const name = previewName(target)
-  const isActive = activePreview?.source === target
 
   activePreviewRef.current = activePreview
   cwdRef.current = cwd
-  targetRef.current = target
 
   useEffect(() => {
     mountedRef.current = true
@@ -42,66 +49,68 @@ export function PreviewAttachment({ source = 'manual', target }: { source?: Prev
 
   useEffect(() => {
     requestTokenRef.current += 1
-    setOpening(false)
-  }, [cwd, target])
+    setOpeningTarget(null)
+  }, [cwd])
 
-  async function togglePreview() {
-    if (opening) {
+  async function openTarget(target: string) {
+    if (openingTarget) {
       return
     }
 
-    if (isActive) {
+    const current = activePreviewRef.current
+
+    if (current?.source === target) {
       dismissPreviewTarget()
 
       return
     }
 
     const requestToken = ++requestTokenRef.current
-    const requestTarget = target
-    const requestCwd = cwd
+    const requestCwd = cwdRef.current
 
-    setOpening(true)
+    setOpeningTarget(target)
 
     try {
-      const preview = await normalizeOrLocalPreviewTarget(requestTarget, requestCwd || undefined)
+      const preview = await normalizeOrLocalPreviewTarget(target, requestCwd || undefined)
 
-      if (
-        !mountedRef.current ||
-        requestTokenRef.current !== requestToken ||
-        targetRef.current !== requestTarget ||
-        cwdRef.current !== requestCwd
-      ) {
+      if (!mountedRef.current || requestTokenRef.current !== requestToken || cwdRef.current !== requestCwd) {
         return
       }
 
       if (!preview) {
-        throw new Error(`Could not open preview target: ${requestTarget}`)
+        throw new Error(`Could not open preview target: ${target}`)
       }
 
-      const currentPreview = activePreviewRef.current
+      const latest = activePreviewRef.current
 
-      if (currentPreview?.source === preview.source && currentPreview.url === preview.url) {
+      if (latest?.source === preview.source && latest.url === preview.url) {
         return
       }
 
-      setCurrentSessionPreviewTarget(preview, source, requestTarget)
+      setCurrentSessionPreviewTarget(preview, source, target)
     } catch (error) {
-      if (
-        !mountedRef.current ||
-        requestTokenRef.current !== requestToken ||
-        targetRef.current !== requestTarget ||
-        cwdRef.current !== requestCwd
-      ) {
+      if (!mountedRef.current || requestTokenRef.current !== requestToken || cwdRef.current !== requestCwd) {
         return
       }
 
       notifyError(error, t.preview.unavailable)
     } finally {
       if (mountedRef.current && requestTokenRef.current === requestToken) {
-        setOpening(false)
+        setOpeningTarget(null)
       }
     }
   }
+
+  return { openTarget, openingTarget }
+}
+
+export function PreviewAttachment({ source = 'manual', target }: { source?: PreviewRecordSource; target: string }) {
+  const { t } = useI18n()
+  const activePreview = useStore($previewTarget)
+  const { openTarget, openingTarget } = usePreviewOpen(source)
+  const name = previewName(target)
+  const isActive = activePreview?.source === target
+  const opening = openingTarget === target
 
   return (
     <div className="flex w-full max-w-160 items-center gap-2 rounded-lg border border-border/55 bg-card/55 px-2.5 py-1.5 text-sm">
@@ -114,11 +123,62 @@ export function PreviewAttachment({ source = 'manual', target }: { source?: Prev
       <button
         className="shrink-0 rounded-md border border-border/55 bg-background/40 px-2 py-1 text-[0.7rem] font-medium text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground disabled:opacity-50"
         disabled={opening}
-        onClick={() => void togglePreview()}
+        onClick={() => void openTarget(target)}
         type="button"
       >
         {opening ? t.preview.opening : isActive ? t.preview.hide : t.preview.openPreview}
       </button>
+    </div>
+  )
+}
+
+export function PreviewGroupAttachment({
+  source = 'manual',
+  targets
+}: {
+  source?: PreviewRecordSource
+  targets: string[]
+}) {
+  const { t } = useI18n()
+  const activePreview = useStore($previewTarget)
+  const { openTarget, openingTarget } = usePreviewOpen(source)
+  const activeTarget = targets.find(target => activePreview?.source === target)
+  const selectedLabel = activeTarget ? previewName(activeTarget) : `${targets.length} links`
+
+  return (
+    <div className="flex w-full max-w-160 items-center gap-2 rounded-xl border border-border/55 bg-card/55 px-2.5 py-2 text-sm shadow-[0_0.0625rem_0.125rem_color-mix(in_srgb,#000_4%,transparent)]">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/55 text-muted-foreground/85">
+        <MonitorPlay className="size-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[0.82rem] font-semibold text-foreground/90">Web preview</span>
+        <span className="block truncate text-[0.7rem] text-muted-foreground">{selectedLabel}</span>
+      </span>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            className="shrink-0 rounded-lg border border-border/55 bg-background/40 px-2.5 py-1.5 text-[0.72rem] font-medium text-muted-foreground transition-colors hover:bg-accent/55 hover:text-foreground focus:outline-none disabled:opacity-50"
+            disabled={Boolean(openingTarget)}
+            type="button"
+          >
+            {openingTarget ? t.preview.opening : `${t.preview.openPreview} ▾`}
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          {targets.map(target => {
+            const name = previewName(target)
+
+            return (
+              <DropdownMenuItem key={target} onClick={() => void openTarget(target)}>
+                <span className="min-w-0">
+                  <span className="block truncate text-[0.78rem] font-medium">{name}</span>
+                  <span className="block truncate text-[0.68rem] text-muted-foreground">{target}</span>
+                </span>
+              </DropdownMenuItem>
+            )
+          })}
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }
