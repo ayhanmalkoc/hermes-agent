@@ -5,8 +5,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import type { HermesGateway } from '@/hermes'
 import { profileColorSoft, resolveProfileColor } from '@/lib/profile-color'
 import { cn } from '@/lib/utils'
-import { $activeGatewayProfile, $profileColors, $profiles, normalizeProfileKey, selectProfile } from '@/store/profile'
+import {
+  $activeGatewayProfile,
+  $profileColors,
+  $profileOrder,
+  $profiles,
+  normalizeProfileKey,
+  selectProfile,
+  sortByProfileOrder
+} from '@/store/profile'
 import { $studioTeamAssignments, $studioTeams, setStudioTeamForSessions } from '@/store/studio-teams'
+import type { ProfileInfo } from '@/types/hermes'
 
 interface StudioTeamButtonProps {
   className?: string
@@ -91,43 +100,104 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
   )
 }
 
-export function StudioAgentButton({ className }: { className?: string }) {
+interface AgentProfileRailProps {
+  className?: string
+}
+
+export function AgentProfileRail({ className }: AgentProfileRailProps) {
   const profiles = useStore($profiles)
   const activeProfile = normalizeProfileKey(useStore($activeGatewayProfile))
+  const order = useStore($profileOrder)
   const colors = useStore($profileColors)
-  const active = profiles.find(profile => normalizeProfileKey(profile.name) === activeProfile) ?? profiles.find(profile => profile.is_default) ?? null
+  const ordered = orderProfilesForComposer(profiles, order)
+  const activeIndex = Math.max(
+    0,
+    ordered.findIndex(profile => normalizeProfileKey(profile.name) === activeProfile)
+  )
+  const active = ordered[activeIndex] ?? ordered.find(profile => profile.is_default) ?? null
+  const before = ordered.slice(Math.max(0, activeIndex - 3), activeIndex)
+  const after = ordered.slice(activeIndex + 1, activeIndex + 4)
 
   if (!profiles.length || !active) {
     return null
   }
 
   return (
-    <Select onValueChange={selectProfile} value={active.name}>
-      <SelectTrigger
-        aria-label="Agent"
-        className={cn(
-          'group relative h-7 w-auto rounded-[8px] border-transparent bg-primary/[0.06] px-2 text-xs transition-colors hover:bg-primary/10 data-[state=open]:bg-primary/10',
-          className
-        )}
-        title="Agent"
-      >
-        <span aria-hidden className="arc-border arc-reverse arc-nous" key={`agent-arc-${active.name}`} />
-        <span className="relative z-10 flex min-w-0 items-center gap-2">
-          {active.is_default ? (
-            <Codicon aria-hidden="true" className="text-muted-foreground/80" name="home" size="0.9rem" />
-          ) : (
-            <ProfileInitial color={resolveProfileColor(active.name, colors)} name={active.name} />
-          )}
-          <SelectValue placeholder="Agent" />
-        </span>
-      </SelectTrigger>
-      <SelectContent>
-        {profiles.map(profile => (
-          <SelectItem key={profile.name} value={profile.name}>
-            {profile.name}
-          </SelectItem>
+    <div className={cn('relative flex max-w-full justify-center px-8', className)}>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 w-10 bg-linear-to-r from-background/70 to-transparent"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background/70 to-transparent"
+      />
+      <div className="flex max-w-full items-center justify-center gap-1 overflow-hidden rounded-full px-1 py-0.5">
+        {before.map(profile => (
+          <AgentProfileRailButton
+            active={false}
+            color={resolveProfileColor(profile.name, colors)}
+            key={profile.name}
+            profile={profile}
+          />
         ))}
-      </SelectContent>
-    </Select>
+        <AgentProfileRailButton active color={resolveProfileColor(active.name, colors)} profile={active} />
+        {after.map(profile => (
+          <AgentProfileRailButton
+            active={false}
+            color={resolveProfileColor(profile.name, colors)}
+            key={profile.name}
+            profile={profile}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function orderProfilesForComposer(profiles: ProfileInfo[], order: string[]): ProfileInfo[] {
+  const defaultProfile = profiles.find(profile => profile.is_default)
+  const named = sortByProfileOrder(
+    profiles.filter(profile => !profile.is_default),
+    order
+  )
+
+  return defaultProfile ? [defaultProfile, ...named] : named
+}
+
+function AgentProfileRailButton({ active, color, profile }: { active: boolean; color: null | string; profile: ProfileInfo }) {
+  const hue = color ?? 'var(--ui-text-quaternary)'
+
+  return (
+    <button
+      aria-label={profile.name}
+      aria-pressed={active}
+      className={cn(
+        'group/profile relative flex h-7 shrink-0 items-center justify-center rounded-[8px] border border-transparent text-xs transition-all duration-150',
+        active
+          ? 'min-w-0 max-w-42 gap-2 bg-primary/[0.06] px-2 text-foreground shadow-sm hover:bg-primary/10'
+          : 'size-6 text-muted-foreground/70 opacity-65 hover:bg-muted/30 hover:text-foreground hover:opacity-100'
+      )}
+      onClick={() => selectProfile(profile.name)}
+      title={profile.name}
+      type="button"
+    >
+      {active && <span aria-hidden className="arc-border arc-reverse arc-nous" key={`agent-rail-arc-${profile.name}`} />}
+      <span className="relative z-10 flex min-w-0 items-center justify-center gap-2">
+        {profile.is_default ? (
+          <Codicon aria-hidden="true" className="text-muted-foreground/80" name="home" size="0.9rem" />
+        ) : (
+          <ProfileInitial color={color} name={profile.name} />
+        )}
+        {active && <span className="min-w-0 truncate">{profile.name}</span>}
+      </span>
+      {!active && !profile.is_default && (
+        <span
+          aria-hidden
+          className="absolute inset-0 rounded-[inherit] opacity-0 transition-opacity group-hover/profile:opacity-100"
+          style={{ boxShadow: `inset 0 0 0 1px ${hue}` }}
+        />
+      )}
+    </button>
   )
 }
