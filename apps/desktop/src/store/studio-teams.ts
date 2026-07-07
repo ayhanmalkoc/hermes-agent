@@ -92,6 +92,22 @@ export function deleteStudioTeam(id: string): void {
   $studioTeamAssignments.set(next)
 }
 
+export function removeProfileFromStudioTeams(profileId: string): void {
+  const target = String(profileId || '').trim()
+
+  if (!target) return
+
+  const teams = $studioTeams.get()
+  const next = teams.map(team => ({
+    ...team,
+    profileIds: team.profileIds.filter(id => id !== target)
+  }))
+
+  if (next.some((team, index) => team.profileIds.length !== teams[index]?.profileIds.length)) {
+    saveTeams(next)
+  }
+}
+
 export async function setStudioTeamForSession(
   sessionId: null | string | undefined,
   teamId: null | string,

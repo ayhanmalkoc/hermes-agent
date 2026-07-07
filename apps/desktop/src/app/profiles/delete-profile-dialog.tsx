@@ -2,6 +2,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { deleteProfile } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { $activeGatewayProfile, normalizeProfileKey, selectProfile, setActiveProfile } from '@/store/profile'
+import { removeProfileFromStudioTeams } from '@/store/studio-teams'
 
 // Thin wrapper over ConfirmDialog: owns the deleteProfile call, inherits
 // Enter-to-confirm + busy/done/error from the shared dialog. The single choke
@@ -32,6 +33,8 @@ export function DeleteProfileDialog({
             {p.deleteDescMid}
             <span className="font-mono text-xs">{profile.path}</span>
             {p.deleteDescSuffix}
+            <br />
+            Teams using this profile will lose this member.
           </>
         ) : null
       }
@@ -49,6 +52,7 @@ export function DeleteProfileDialog({
         // racing the (still-dying) backend can't clobber the pill back to it.
         const wasActive = normalizeProfileKey(profile.name) === normalizeProfileKey($activeGatewayProfile.get())
         await deleteProfile(profile.name)
+        removeProfileFromStudioTeams(profile.name)
         await onDeleted?.()
 
         if (wasActive) {

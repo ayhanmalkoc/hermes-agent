@@ -9,6 +9,7 @@ import {
   createStudioTeam,
   deleteStudioTeam,
   getStudioTeamForSession,
+  removeProfileFromStudioTeams,
   setStudioTeamForSessions,
   setStudioTeamForSession,
   studioTeamPromptContext,
@@ -89,6 +90,25 @@ describe('studio teams store', () => {
     expect(studioTeamPromptContext(null)).toContain('For simple one-shot questions')
     expect(studioTeamPromptContext(null)).toContain('tasks[].profile_id')
     expect(studioTeamPromptContext(null)).toContain('profile_id')
+  })
+
+  it('removes a deleted profile from existing teams without deleting teams', () => {
+    const team = createStudioTeam({
+      description: 'Runtime work',
+      instructions: 'Use specialists.',
+      name: 'Runtime Team',
+      profileIds: ['planner', 'deployer', 'planner']
+    })
+    const other = createStudioTeam({
+      description: 'Research work',
+      instructions: '',
+      name: 'Research Team',
+      profileIds: ['researcher']
+    })
+
+    removeProfileFromStudioTeams('planner')
+
+    expect($studioTeams.get()).toEqual([{ ...team, profileIds: ['deployer'] }, other])
   })
 
   it('binds a draft team selection to the first real session', async () => {

@@ -32,7 +32,7 @@ import { slug } from '@/lib/sanitize'
 import { cn } from '@/lib/utils'
 import { notify, notifyError } from '@/store/notifications'
 import { $profileColors, refreshActiveProfile } from '@/store/profile'
-import { $studioTeams, updateStudioTeam } from '@/store/studio-teams'
+import { $studioTeams, removeProfileFromStudioTeams, updateStudioTeam } from '@/store/studio-teams'
 import { BUILTIN_STUDIO_AGENT_PRESETS, ensureStudioAgentPresetProfile } from '@/store/studio-team-presets'
 
 import { useRefreshHotkey } from '../hooks/use-refresh-hotkey'
@@ -164,6 +164,7 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
 
     try {
       await deleteProfile(pendingDelete.name)
+      removeProfileFromStudioTeams(pendingDelete.name)
       notify({ kind: 'success', title: p.deleted, message: pendingDelete.name })
       setPendingDelete(null)
       setSelectedName(null)
@@ -323,6 +324,8 @@ export function ProfilesView({ onClose, showTeamLinks = false, title }: Profiles
                   {p.deleteDescMid}
                   <span className="font-mono text-xs">{pendingDelete.path}</span>
                   {p.deleteDescSuffix}
+                  <br />
+                  Teams using this profile will lose this member.
                 </>
               ) : null}
             </DialogDescription>
