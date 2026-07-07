@@ -115,7 +115,8 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
     ordered.findIndex(profile => normalizeProfileKey(profile.name) === activeProfile)
   )
   const active = ordered[activeIndex] ?? ordered.find(profile => profile.is_default) ?? null
-  const { left, right } = active ? profilesAroundActive(ordered, activeIndex, 3) : { left: [], right: [] }
+  const left = ordered.slice(0, activeIndex)
+  const right = ordered.slice(activeIndex + 1)
 
   if (!profiles.length || !active) {
     return null
@@ -131,7 +132,7 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
         aria-hidden
         className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-linear-to-l from-background/70 to-transparent"
       />
-      <div className="flex min-w-0 items-center justify-end gap-2 overflow-hidden pr-2">
+      <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {left.map(profile => (
           <AgentProfileRailButton
             active={false}
@@ -144,7 +145,7 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
       <div className="flex justify-center px-1">
         <AgentProfileRailButton active color={resolveProfileColor(active.name, colors)} profile={active} />
       </div>
-      <div className="flex min-w-0 items-center justify-start gap-2 overflow-hidden pl-2">
+      <div className="flex min-w-0 items-center justify-start gap-2 overflow-x-auto pl-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {right.map(profile => (
           <AgentProfileRailButton
             active={false}
@@ -156,43 +157,6 @@ export function AgentProfileRail({ className }: AgentProfileRailProps) {
       </div>
     </div>
   )
-}
-
-function profilesAroundActive(profiles: ProfileInfo[], activeIndex: number, sideCount: number) {
-  const others = profiles.filter((_, index) => index !== activeIndex)
-  const left: ProfileInfo[] = []
-  const right: ProfileInfo[] = []
-
-  for (let offset = 1; offset <= sideCount; offset += 1) {
-    const before = profiles[activeIndex - offset]
-    const after = profiles[activeIndex + offset]
-
-    if (before) {
-      left.unshift(before)
-    }
-
-    if (after) {
-      right.push(after)
-    }
-  }
-
-  for (const profile of others) {
-    if (left.length >= sideCount && right.length >= sideCount) {
-      break
-    }
-
-    if (left.includes(profile) || right.includes(profile)) {
-      continue
-    }
-
-    if (left.length <= right.length && left.length < sideCount) {
-      left.unshift(profile)
-    } else if (right.length < sideCount) {
-      right.push(profile)
-    }
-  }
-
-  return { left, right }
 }
 
 function orderProfilesForComposer(profiles: ProfileInfo[], order: string[]): ProfileInfo[] {
