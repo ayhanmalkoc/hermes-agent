@@ -103,8 +103,23 @@ describe('studio teams store', () => {
     await bindDraftStudioTeamToSession('session-new')
 
     expect(getStudioTeamForSession('session-new')?.id).toBe(team.id)
+    expect(getStudioTeamForSession(null)).toBeNull()
     expect(studioTeamPromptContext('session-new')).toContain('Team: Delivery Team')
     expect(studioTeamPromptContext('session-new')).toContain('Members: planner, coder')
+  })
+
+  it('keeps draft team selection ephemeral instead of persisting it', () => {
+    const team = createStudioTeam({
+      description: 'Ephemeral draft',
+      instructions: 'Use selected profiles.',
+      name: 'Draft Team',
+      profileIds: ['planner']
+    })
+
+    setStudioTeamForSession(null, team.id)
+
+    expect(getStudioTeamForSession(null)?.id).toBe(team.id)
+    expect(window.localStorage.getItem('hermes.desktop.studio.teamDraftAssignment')).toBeNull()
   })
 
   it('resolves team prompt context across runtime and stored session ids', async () => {

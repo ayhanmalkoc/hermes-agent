@@ -20,6 +20,7 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
   const assignments = useStore($studioTeamAssignments)
   const key = sessionId?.trim() || 'draft'
   const value = assignments[key] ?? NO_TEAM
+  const selectedTeam = value === NO_TEAM ? null : teams.find(team => team.id === value) ?? null
 
   if (!teams.length) {
     return null
@@ -38,9 +39,16 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
     >
       <SelectTrigger
         aria-label="Team"
-        className={cn('h-7 w-auto rounded-full px-2 text-xs', className)}
+        className={cn(
+          'relative h-7 w-auto overflow-hidden px-2 text-xs transition-colors',
+          selectedTeam
+            ? 'rounded-[8px] bg-primary/[0.06] hover:bg-primary/10 data-[state=open]:bg-primary/10'
+            : 'rounded-full',
+          className
+        )}
         title="Team"
       >
+        {selectedTeam ? <span aria-hidden className="arc-border arc-reverse arc-nous" /> : null}
         <Codicon aria-hidden="true" name="organization" size="0.9rem" />
         <SelectValue placeholder="Team" />
       </SelectTrigger>

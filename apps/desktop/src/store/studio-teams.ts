@@ -3,7 +3,6 @@ import { atom, computed } from 'nanostores'
 import { readKey, writeKey } from '@/lib/storage'
 
 const TEAMS_STORAGE_KEY = 'hermes.desktop.studio.teams'
-const DRAFT_ASSIGNMENT_STORAGE_KEY = 'hermes.desktop.studio.teamDraftAssignment'
 export const DRAFT_STUDIO_SESSION_KEY = 'draft'
 
 export interface StudioTeam {
@@ -56,17 +55,8 @@ function newId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `team-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-function readDraftTeamId(): null | string {
-  const value = readKey(DRAFT_ASSIGNMENT_STORAGE_KEY)?.trim()
-  return value || null
-}
-
-function writeDraftTeamId(teamId: null | string): void {
-  writeKey(DRAFT_ASSIGNMENT_STORAGE_KEY, teamId?.trim() || '')
-}
-
 export const $studioTeams = atom<StudioTeam[]>(normalizeTeams(parseJson(readKey(TEAMS_STORAGE_KEY), [])))
-export const $studioTeamAssignments = atom<Record<string, string>>(readDraftTeamId() ? { draft: readDraftTeamId()! } : {})
+export const $studioTeamAssignments = atom<Record<string, string>>({})
 
 export const $studioTeamsById = computed($studioTeams, teams => new Map(teams.map(team => [team.id, team])))
 
@@ -83,7 +73,6 @@ function updateCachedAssignment(sessionId: null | string | undefined, teamId: nu
   else delete next[key]
 
   $studioTeamAssignments.set(next)
-  if (key === DRAFT_STUDIO_SESSION_KEY) writeDraftTeamId(teamId)
 }
 
 export function createStudioTeam(input: Omit<StudioTeam, 'id'>): StudioTeam {
@@ -101,7 +90,6 @@ export function deleteStudioTeam(id: string): void {
   saveTeams($studioTeams.get().filter(team => team.id !== id))
   const next = Object.fromEntries(Object.entries($studioTeamAssignments.get()).filter(([, teamId]) => teamId !== id))
   $studioTeamAssignments.set(next)
-  if (readDraftTeamId() === id) writeDraftTeamId(null)
 }
 
 export async function setStudioTeamForSession(
@@ -168,7 +156,7 @@ export async function bindDraftStudioTeamToSession(
 
   if (!sid) return
 
-  const draftTeamId = $studioTeamAssignments.get()[DRAFT_STUDIO_SESSION_KEY] || readDraftTeamId()
+  const draftTeamId = $studioTeamAssignments.get()[DRAFT_STUDIO_SESSION_KEY]
   const current = getStudioTeamForSession(sid)
 
   if (!draftTeamId || current) return
@@ -178,6 +166,7 @@ export async function bindDraftStudioTeamToSession(
   }
 
   await setStudioTeamForSession(sid, draftTeamId, requestGateway)
+  updateCachedAssignment(null, null)
 }
 
 export function studioTeamPromptContextFromTeam(team: null | StudioTeam): string {

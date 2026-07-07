@@ -402,6 +402,7 @@ describe('usePromptActions slash.exec dispatch payloads', () => {
     expect(calls[2]?.params?.text).toContain('Members: planner, coder')
     expect(calls[2]?.params?.text).toContain('plan the launch')
     expect($studioTeamAssignments.get()[RUNTIME_SESSION_ID]).toBe(team.id)
+    expect($studioTeamAssignments.get().draft).toBeUndefined()
   })
 
   it('dispatches a slash command with a multiline arg instead of "empty slash command" (#41323, #55510)', async () => {
