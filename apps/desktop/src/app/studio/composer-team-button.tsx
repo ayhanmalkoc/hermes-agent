@@ -43,12 +43,16 @@ export function StudioTeamButton({ className, gateway, sessionId, storedSessionI
           'group relative h-7 w-auto px-2 text-xs transition-colors',
           hasTeamValue
             ? 'rounded-[8px] border-transparent bg-primary/[0.06] hover:bg-primary/10 data-[state=open]:bg-primary/10'
-            : 'rounded-full',
+            : 'rounded-[8px] border-transparent bg-muted/20 hover:bg-muted/30 data-[state=open]:bg-muted/30',
           className
         )}
         title="Team"
       >
-        {hasTeamValue ? <span aria-hidden className="arc-border arc-reverse arc-nous" key={`team-arc-${value}`} /> : null}
+        <span
+          aria-hidden
+          className={hasTeamValue ? 'arc-border arc-reverse arc-nous' : 'arc-border arc-muted'}
+          key={`team-arc-${value}`}
+        />
         <span className="relative z-10 flex min-w-0 items-center gap-2">
           <Codicon aria-hidden="true" name="organization" size="0.9rem" />
           <SelectValue placeholder="Team" />

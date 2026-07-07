@@ -676,6 +676,14 @@
   --arc-duration: 3.27s;
 }
 
+.arc-border.arc-muted,
+:root.dark .arc-border.arc-muted {
+  --arc-c0: transparent;
+  --arc-c1: color-mix(in srgb, var(--dt-foreground) 24%, transparent);
+  --arc-c2: color-mix(in srgb, var(--dt-foreground) 10%, transparent);
+  --arc-duration: 5.6s;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .arc-border::before {
     animation: none;
