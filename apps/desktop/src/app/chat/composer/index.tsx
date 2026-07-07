@@ -5,23 +5,27 @@ import {
   type FormEvent,
   type KeyboardEvent,
   useEffect,
-  useRef
+  useRef,
+  useState
 } from 'react'
 
 import { StudioGoalButton } from '@/app/studio/composer-goal-button'
-import { StudioTeamButton } from '@/app/studio/composer-team-button'
+import { StudioAgentButton, StudioTeamButton } from '@/app/studio/composer-team-button'
 import { composerFill, composerSurfaceGlass } from '@/components/chat/composer-dock'
 import { Button } from '@/components/ui/button'
+import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { chatMessageText } from '@/lib/chat-messages'
 import { DATA_IMAGE_URL_RE } from '@/lib/embedded-images'
 import { triggerHaptic } from '@/lib/haptics'
+import { profileColorSoft, resolveProfileColor } from '@/lib/profile-color'
 import { cn } from '@/lib/utils'
 import { $composerAttachments } from '@/store/composer'
 import { browseBackward, browseForward, deriveUserHistory, isBrowsingHistory } from '@/store/composer-input-history'
 import { POPOUT_WIDTH_REM } from '@/store/composer-popout'
 import { removeQueuedPrompt } from '@/store/composer-queue'
 import { $activeSessionAwaitingInput } from '@/store/prompts'
+import { $activeGatewayProfile, $profileColors, $profiles, normalizeProfileKey } from '@/store/profile'
 import { toggleReview } from '@/store/review'
 import { $gatewayState, $messages } from '@/store/session'
 import { $threadScrolledUp } from '@/store/thread-scroll'
@@ -71,6 +75,68 @@ import type { ChatBarProps } from './types'
 import { UrlDialog } from './url-dialog'
 import { VoiceActivity, VoicePlaybackActivity } from './voice-activity'
 
+type StudioComposerMode = 'agent' | 'team'
+
+function ActiveAgentGlyph() {
+  const profiles = useStore($profiles)
+  const activeProfile = normalizeProfileKey(useStore($activeGatewayProfile))
+  const colors = useStore($profileColors)
+  const profile = profiles.find(item => normalizeProfileKey(item.name) === activeProfile)
+
+  if (!profile || profile.is_default) {
+    return <Codicon aria-hidden="true" name="account" size="0.82rem" />
+  }
+
+  const color = resolveProfileColor(profile.name, colors)
+  const hue = color ?? 'var(--ui-text-quaternary)'
+  const initial =
+    profile.name
+      .replace(/[^a-z0-9]/gi, '')
+      .charAt(0)
+      .toUpperCase() || '?'
+
+  return (
+    <span
+      aria-hidden="true"
+      className="grid size-4 place-items-center rounded-[3px] text-[0.5rem] font-semibold uppercase leading-none"
+      style={{ backgroundColor: profileColorSoft(hue, 26), color: color ?? undefined }}
+    >
+      {initial}
+    </span>
+  )
+}
+
+function StudioModeToggle({ mode, onModeChange }: { mode: StudioComposerMode; onModeChange: (mode: StudioComposerMode) => void }) {
+  return (
+    <div className="flex h-7 items-center rounded-[8px] bg-muted/20 p-0.5">
+      <button
+        aria-label="Team mode"
+        aria-pressed={mode === 'team'}
+        className={cn(
+          'grid size-6 place-items-center rounded-[6px] text-muted-foreground transition-colors hover:text-foreground',
+          mode === 'team' && 'bg-background/80 text-foreground shadow-xs'
+        )}
+        onClick={() => onModeChange('team')}
+        type="button"
+      >
+        <Codicon aria-hidden="true" name="organization" size="0.82rem" />
+      </button>
+      <button
+        aria-label="Agent mode"
+        aria-pressed={mode === 'agent'}
+        className={cn(
+          'grid size-6 place-items-center rounded-[6px] text-muted-foreground transition-colors hover:text-foreground',
+          mode === 'agent' && 'bg-background/80 text-foreground shadow-xs'
+        )}
+        onClick={() => onModeChange('agent')}
+        type="button"
+      >
+        <ActiveAgentGlyph />
+      </button>
+    </div>
+  )
+}
+
 export function ChatBar({
   busy,
   cwd,
@@ -98,6 +164,7 @@ export function ChatBar({
   const attachments = useStore($composerAttachments)
   const scrolledUp = useStore($threadScrolledUp)
   const autoSpeak = useStore($autoSpeakReplies)
+  const [studioMode, setStudioMode] = useState<StudioComposerMode>('team')
   // The turn is parked on the user (clarify / approval / sudo / secret). Esc must
   // not interrupt it — there's nothing actively running to stop, and stopping
   // would discard a question the user may want to come back to. The blocking
@@ -694,7 +761,16 @@ export function ChatBar({
     </>
   )
 
-  const teamSelector = <StudioTeamButton gateway={gateway} sessionId={sessionId} storedSessionId={storedSessionId} />
+  const studioSelector = (
+    <div className="flex w-fit items-center gap-1.5 pl-1">
+      <StudioModeToggle mode={studioMode} onModeChange={setStudioMode} />
+      {studioMode === 'team' ? (
+        <StudioTeamButton gateway={gateway} sessionId={sessionId} storedSessionId={storedSessionId} />
+      ) : (
+        <StudioAgentButton />
+      )}
+    </div>
+  )
 
   const controls = (
     <ComposerControls
@@ -981,7 +1057,7 @@ export function ChatBar({
                   </div>
                 )}
                 {attachments.length > 0 && <AttachmentList attachments={attachments} onRemove={onRemoveAttachment} />}
-                <div className="flex w-fit items-center pl-1">{teamSelector}</div>
+                {studioSelector}
                 <div
                   className={cn(
                     'grid w-full',
