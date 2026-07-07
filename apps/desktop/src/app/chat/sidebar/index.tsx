@@ -106,7 +106,6 @@ import { countLabel } from './chrome'
 import { SidebarCronJobsSection } from './cron-jobs-section'
 import { SidebarLoadMoreRow } from './load-more-row'
 import { orderByIds, reconcileOrderIds, resolveManualSessionOrderIds, sameIds } from './order'
-import { ProfileRail } from './profile-switcher'
 import { ProjectDialog } from './project-dialog'
 import {
   overlayLiveLanes,
@@ -1414,7 +1413,6 @@ export function ChatSidebar({
 
         {contentVisible && (
           <div className="shrink-0 space-y-1 px-0.5 pb-1 pt-0.5">
-            <ProfileRail />
             {studioModeEnabled && studioQuickActions.length > 0 && <StudioSidebarQuickActions items={studioQuickActions} />}
           </div>
         )}
