@@ -1,4 +1,4 @@
-import { act, cleanup, render, waitFor } from '@testing-library/react'
+import { act, cleanup, render } from '@testing-library/react'
 import { useEffect, useRef } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -6,8 +6,7 @@ import { assistantTextPart, type ChatMessage } from '@/lib/chat-messages'
 import {
   $previewTarget,
   clearSessionPreviewRegistry,
-  type PreviewTarget,
-  registerSessionPreview
+  type PreviewTarget
 } from '@/store/preview'
 import { $currentCwd, $messages } from '@/store/session'
 import type { RpcEvent } from '@/types/hermes'
@@ -83,10 +82,26 @@ describe('usePreviewRouting', () => {
     vi.restoreAllMocks()
   })
 
-  it('opens the active session preview from the registry', async () => {
+  it('ignores legacy session preview registry on mount', async () => {
     const target = previewTarget('/work/demo.html')
 
-    registerSessionPreview('session-1', target, 'tool-result')
+    window.localStorage.setItem(
+      'hermes.desktop.sessionPreviews.v1',
+      JSON.stringify({
+        'session-1': [
+          {
+            autoOpen: true,
+            createdAt: Date.now(),
+            id: 'session-1:file:///work/demo.html',
+            normalized: { ...target, renderMode: 'preview' },
+            sessionId: 'session-1',
+            source: 'tool-result',
+            target: '/work/demo.html'
+          }
+        ]
+      })
+    )
+
     render(
       <PreviewRoutingHarness
         onEvent={handler => {
@@ -95,9 +110,8 @@ describe('usePreviewRouting', () => {
       />
     )
 
-    await waitFor(() => {
-      expect($previewTarget.get()).toEqual({ ...target, renderMode: 'preview' })
-    })
+    expect($previewTarget.get()).toBeNull()
+    expect(window.hermesDesktop.normalizePreviewTarget).not.toHaveBeenCalled()
   })
 
   it('does not infer previews from assistant prose', async () => {

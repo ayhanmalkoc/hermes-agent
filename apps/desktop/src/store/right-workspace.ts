@@ -201,12 +201,37 @@ function targetTitle(target: PreviewTarget | null | undefined): string {
   return tail || label || 'Open file'
 }
 
-function targetKey(target: PreviewTarget): string {
+export function rightWorkspaceTargetKey(target: PreviewTarget): string {
   return [target.kind, target.url, target.source, target.renderMode, target.previewKind].filter(Boolean).join(':')
 }
 
 function filesTabId(target: PreviewTarget | null | undefined): string {
-  return target ? `files:${targetKey(target)}` : 'files:empty'
+  return target ? `files:${rightWorkspaceTargetKey(target)}` : 'files:empty'
+}
+
+export function rightWorkspaceTabMatchesTarget(tab: RightWorkspaceTab, target: PreviewTarget): boolean {
+  const key = rightWorkspaceTargetKey(target)
+
+  if (tab.target && rightWorkspaceTargetKey(tab.target) === key) {
+    return true
+  }
+
+  return tab.kind === 'browser' && tab.url === target.url
+}
+
+export function rightWorkspaceTabMatchesRawTarget(tab: RightWorkspaceTab, rawTarget: string): boolean {
+  const target = rawTarget.trim()
+
+  if (!target) {
+    return false
+  }
+
+  return (
+    tab.url === target ||
+    tab.target?.source === target ||
+    tab.target?.path === target ||
+    tab.target?.url === target
+  )
 }
 
 function singletonId(kind: RightWorkspaceTabKind): string {
@@ -269,7 +294,7 @@ function buildRightWorkspaceTab(
     wordWrapEnabled: existing?.wordWrapEnabled ?? true,
     treeFilter: existing?.treeFilter ?? '',
     selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
-    target: input.kind === 'files' ? (input.target ?? null) : undefined,
+    target: input.kind === 'files' || input.kind === 'browser' ? (input.target ?? existing?.target ?? null) : undefined,
     terminalId: input.kind === 'terminal' ? input.terminalId : undefined,
     url: input.kind === 'browser' ? (input.url ?? existing?.url ?? 'https://example.com') : undefined,
     title: defaultTitle(input),
@@ -417,16 +442,34 @@ export function openTerminalWorkspaceForTerminal(terminalId: string, title = 'Te
   return openRightWorkspaceTab({ activate, kind: 'terminal', terminalId, title })
 }
 
-export function openBrowserWorkspace(url = 'https://example.com', activate = true, options: { ephemeral?: boolean } = {}): RightWorkspaceTab {
-  return openRightWorkspaceTab({ activate, ephemeral: options.ephemeral, kind: 'browser', title: 'Browser', url })
+export function openBrowserWorkspace(
+  url = 'https://example.com',
+  activate = true,
+  options: { ephemeral?: boolean; target?: PreviewTarget | null } = {}
+): RightWorkspaceTab {
+  return openRightWorkspaceTab({
+    activate,
+    ephemeral: options.ephemeral,
+    kind: 'browser',
+    target: options.target ?? null,
+    title: 'Browser',
+    url
+  })
 }
 
-export function closeEphemeralRightWorkspaceTabsForTarget(target: PreviewTarget): void {
-  const key = targetKey(target)
+export function closeRightWorkspaceTabsForTarget(target: PreviewTarget): void {
   const current = $rightWorkspaceTabs.get()
-  const ephemeralTabs = current.filter(tab => tab.ephemeral && (tab.target ? targetKey(tab.target) === key : tab.url === target.url))
+  const matchingTabs = current.filter(tab => rightWorkspaceTabMatchesTarget(tab, target))
 
-  for (const tab of ephemeralTabs) {
+  for (const tab of matchingTabs) {
+    closeRightWorkspaceTab(tab.id)
+  }
+}
+
+export function closeRightWorkspaceTabsForRawTarget(rawTarget: string): void {
+  const matchingTabs = $rightWorkspaceTabs.get().filter(tab => rightWorkspaceTabMatchesRawTarget(tab, rawTarget))
+
+  for (const tab of matchingTabs) {
     closeRightWorkspaceTab(tab.id)
   }
 }

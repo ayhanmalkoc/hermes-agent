@@ -65,47 +65,54 @@ describe('preview store', () => {
     expect(statuses).toEqual(['idle', 'running'])
   })
 
-  it('persists registered previews and dismissal per session', () => {
+  it('opens previews through right workspace without registering session previews', () => {
     const target = previewTarget('/work/demo.html')
 
     setCurrentSessionPreviewTarget(target, 'tool-result')
 
     expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
     expect($paneOpen(RIGHT_WORKSPACE_PANE_ID).get()).toBe(true)
-    expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/demo.html' })
-    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
-    expect(window.localStorage.getItem('hermes.desktop.sessionPreviews.v1')).toContain('/work/demo.html')
+    expect($activeRightWorkspaceTab.get()).toMatchObject({
+      kind: 'browser',
+      target: withRenderMode(target, 'preview'),
+      url: 'file:///work/demo.html'
+    })
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
+    expect($sessionPreviewRegistry.get()).toEqual({})
+    expect(window.localStorage.getItem('hermes.desktop.sessionPreviews.v1')).toBeNull()
 
     dismissPreviewTarget()
 
     expect($previewTarget.get()).toBeNull()
     expect($paneOpen(RIGHT_WORKSPACE_PANE_ID).get()).toBe(true)
     expect(getSessionPreviewRecord('session-1')).toBeNull()
-    expect($sessionPreviewRegistry.get()['session-1']?.[0]?.dismissedAt).toEqual(expect.any(Number))
+    expect($rightWorkspaceTabs.get()).toEqual([])
 
     setCurrentSessionPreviewTarget(target, 'tool-result')
 
-    expect(getSessionPreviewRecord('session-1')?.dismissedAt).toBeUndefined()
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
   })
 
-  it('replaces the session preview instead of keeping a back stack', () => {
+  it('keeps multiple workspace previews as tabs instead of a registry back stack', () => {
     const first = previewTarget('/work/first.html')
     const second = previewTarget('/work/second.html')
 
     setCurrentSessionPreviewTarget(first, 'tool-result')
     setCurrentSessionPreviewTarget(second, 'tool-result')
 
-    expect($sessionPreviewRegistry.get()['session-1']).toHaveLength(1)
-    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(second, 'preview'))
+    expect($sessionPreviewRegistry.get()).toEqual({})
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
+    expect($rightWorkspaceTabs.get()).toMatchObject([
+      { kind: 'browser', target: withRenderMode(first, 'preview'), url: 'file:///work/first.html' },
+      { kind: 'browser', target: withRenderMode(second, 'preview'), url: 'file:///work/second.html' }
+    ])
     expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/second.html' })
 
     dismissPreviewTarget()
 
     expect($previewTarget.get()).toBeNull()
     expect(getSessionPreviewRecord('session-1')).toBeNull()
-    expect($sessionPreviewRegistry.get()['session-1']?.map(record => record.normalized.url)).toEqual([
-      'file:///work/second.html'
-    ])
+    expect($rightWorkspaceTabs.get()).toMatchObject([{ kind: 'browser', url: 'file:///work/first.html' }])
   })
 
   it('keeps file inspection separate from live preview', () => {
@@ -118,7 +125,7 @@ describe('preview store', () => {
 
     expect($activeRightWorkspaceTab.get()?.target).toEqual(withRenderMode(target, 'source'))
     expect($previewTarget.get()).toEqual(withRenderMode(preview, 'preview'))
-    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(preview, 'preview'))
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
 
     dismissPreviewTarget()
 
@@ -133,7 +140,7 @@ describe('preview store', () => {
 
     expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/from-chat.html' })
     expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
-    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
   })
 
   it('opens artifact HTML files in Browser', () => {
@@ -143,7 +150,7 @@ describe('preview store', () => {
 
     expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/artifact.html' })
     expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
-    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
+    expect(getSessionPreviewRecord('session-1')).toBeNull()
   })
 
   it('keeps file tabs when a live preview opens', () => {

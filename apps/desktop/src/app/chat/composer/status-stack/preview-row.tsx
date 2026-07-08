@@ -9,10 +9,13 @@ import { useI18n } from '@/i18n'
 import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { cn } from '@/lib/utils'
 import { notifyError } from '@/store/notifications'
-import { $paneOpen } from '@/store/panes'
 import { $previewTarget, dismissPreviewTarget, setCurrentSessionPreviewTarget } from '@/store/preview'
 import { type PreviewArtifact } from '@/store/preview-status'
-import { $activeRightWorkspaceTab, RIGHT_WORKSPACE_PANE_ID } from '@/store/right-workspace'
+import {
+  $rightWorkspaceTabs,
+  closeRightWorkspaceTabsForRawTarget,
+  rightWorkspaceTabMatchesRawTarget
+} from '@/store/right-workspace'
 
 interface PreviewStatusRowProps {
   item: PreviewArtifact
@@ -23,12 +26,9 @@ interface PreviewStatusRowProps {
 export const PreviewStatusRow = memo(function PreviewStatusRow({ item, onDismiss }: PreviewStatusRowProps) {
   const { t } = useI18n()
   const activePreview = useStore($previewTarget)
-  const activeWorkspaceTab = useStore($activeRightWorkspaceTab)
-  const previewPaneOpen = useStore($paneOpen(RIGHT_WORKSPACE_PANE_ID))
+  const rightWorkspaceTabs = useStore($rightWorkspaceTabs)
   const [opening, setOpening] = useState(false)
-  const isOpen = activePreview?.source === item.target && previewPaneOpen && (
-    activeWorkspaceTab?.target?.source === item.target || activeWorkspaceTab?.url === activePreview.url
-  )
+  const isOpen = rightWorkspaceTabs.some(tab => rightWorkspaceTabMatchesRawTarget(tab, item.target))
 
   const resolveTarget = async () => {
     const target = await normalizeOrLocalPreviewTarget(item.target, item.cwd || undefined)
@@ -46,7 +46,11 @@ export const PreviewStatusRow = memo(function PreviewStatusRow({ item, onDismiss
     }
 
     if (isOpen) {
-      dismissPreviewTarget()
+      if (activePreview?.source === item.target) {
+        dismissPreviewTarget()
+      } else {
+        closeRightWorkspaceTabsForRawTarget(item.target)
+      }
 
       return
     }

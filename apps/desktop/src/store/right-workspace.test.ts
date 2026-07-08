@@ -4,7 +4,8 @@ import {
   $activeRightWorkspaceTabId,
   $rightWorkspaceSizeMode,
   $rightWorkspaceTabs,
-  closeEphemeralRightWorkspaceTabsForTarget,
+  closeRightWorkspaceTabsForRawTarget,
+  closeRightWorkspaceTabsForTarget,
   openBrowserWorkspace,
   openFilesWorkspaceTarget,
   openReviewWorkspace,
@@ -100,7 +101,7 @@ describe('right workspace session scope', () => {
     ])
   })
 
-  it('closes only matching ephemeral preview tabs', () => {
+  it('closes matching preview tabs regardless of source', () => {
     const target = {
       kind: 'file' as const,
       label: 'report.html',
@@ -110,10 +111,29 @@ describe('right workspace session scope', () => {
       url: 'https://gateway/api/preview/file/id/report.html'
     }
 
-    openFilesWorkspaceTarget(target, { ephemeral: true })
+    openFilesWorkspaceTarget(target)
     openBrowserWorkspace('https://example.com/manual')
 
-    closeEphemeralRightWorkspaceTabsForTarget(target)
+    closeRightWorkspaceTabsForTarget(target)
+
+    expect($rightWorkspaceTabs.get()).toMatchObject([{ kind: 'browser', url: 'https://example.com/manual' }])
+  })
+
+  it('closes matching tabs by raw target for chat cards', () => {
+    const target = {
+      kind: 'file' as const,
+      label: 'summary.html',
+      path: '/tmp/summary.html',
+      previewKind: 'html' as const,
+      renderMode: 'preview' as const,
+      source: '/tmp/summary.html',
+      url: 'https://gateway/api/preview/file/id/summary.html'
+    }
+
+    openBrowserWorkspace(target.url, true, { target })
+    openBrowserWorkspace('https://example.com/manual')
+
+    closeRightWorkspaceTabsForRawTarget('/tmp/summary.html')
 
     expect($rightWorkspaceTabs.get()).toMatchObject([{ kind: 'browser', url: 'https://example.com/manual' }])
   })

@@ -1,21 +1,15 @@
-import { useStore } from '@nanostores/react'
-import { type MutableRefObject, useCallback, useEffect } from 'react'
+import { type MutableRefObject, useCallback } from 'react'
 
 import { gatewayEventCompletedFileDiff } from '@/lib/gateway-events'
-import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import {
   $previewTarget,
-  $sessionPreviewRegistry,
   beginPreviewServerRestart,
   completePreviewServerRestart,
-  getSessionPreviewRecord,
   progressPreviewServerRestart,
   requestPreviewReload,
-  setPreviewTarget
 } from '@/store/preview'
 import { $currentCwd } from '@/store/session'
 import type { RpcEvent } from '@/types/hermes'
-import type { PreviewTarget } from '@/store/preview'
 
 type EventHandler = (event: RpcEvent) => void
 
@@ -33,68 +27,12 @@ function asRecord(payload: unknown): Record<string, unknown> {
   return payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
 }
 
-function activePreviewSessionId(
-  activeSessionIdRef: MutableRefObject<string | null>,
-  routedSessionId: string | null,
-  selectedStoredSessionId: string | null
-): string {
-  return selectedStoredSessionId || routedSessionId || activeSessionIdRef.current || ''
-}
-
-function restoredPreviewTarget(target: PreviewTarget): PreviewTarget {
-  return target.kind === 'file' && target.previewKind === 'html'
-    ? { ...target, renderMode: 'preview' }
-    : target
-}
-
 export function usePreviewRouting({
   activeSessionIdRef,
   baseHandleGatewayEvent,
   currentCwd,
-  currentView,
-  requestGateway,
-  routedSessionId,
-  selectedStoredSessionId
+  requestGateway
 }: PreviewRoutingOptions) {
-  const previewRegistry = useStore($sessionPreviewRegistry)
-  const previewSessionId = activePreviewSessionId(activeSessionIdRef, routedSessionId, selectedStoredSessionId)
-
-  // Restore a *user-opened* preview when its session becomes active. Tool
-  // results no longer auto-register/open a preview — the inline preview card in
-  // the tool row is the only entry point, so HTML artifacts never pop the rail
-  // open on their own.
-  useEffect(() => {
-    let cancelled = false
-
-    if (currentView !== 'chat' || !previewSessionId) {
-      setPreviewTarget(null)
-
-      return () => {
-        cancelled = true
-      }
-    }
-
-    const record = getSessionPreviewRecord(previewSessionId)
-
-    if (!record) {
-      setPreviewTarget(null)
-
-      return () => {
-        cancelled = true
-      }
-    }
-
-    void normalizeOrLocalPreviewTarget(record.target, currentCwd || undefined).then(target => {
-      if (!cancelled) {
-        setPreviewTarget(restoredPreviewTarget(target ?? record.normalized))
-      }
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [currentCwd, currentView, previewRegistry, previewSessionId])
-
   const restartPreviewServer = useCallback(
     async (url: string, context?: string) => {
       const sessionId = activeSessionIdRef.current

@@ -12,6 +12,11 @@ import {
   type PreviewRecordSource,
   setCurrentSessionPreviewTarget
 } from '@/store/preview'
+import {
+  $rightWorkspaceTabs,
+  closeRightWorkspaceTabsForRawTarget,
+  rightWorkspaceTabMatchesRawTarget
+} from '@/store/right-workspace'
 import { $currentCwd } from '@/store/session'
 import {
   DropdownMenu,
@@ -29,13 +34,16 @@ function usePreviewOpen(source: PreviewRecordSource | ((target: string) => Previ
   const { t } = useI18n()
   const cwd = useStore($currentCwd)
   const activePreview = useStore($previewTarget)
+  const rightWorkspaceTabs = useStore($rightWorkspaceTabs)
   const [openingTarget, setOpeningTarget] = useState<string | null>(null)
   const activePreviewRef = useRef(activePreview)
+  const rightWorkspaceTabsRef = useRef(rightWorkspaceTabs)
   const cwdRef = useRef(cwd)
   const mountedRef = useRef(false)
   const requestTokenRef = useRef(0)
 
   activePreviewRef.current = activePreview
+  rightWorkspaceTabsRef.current = rightWorkspaceTabs
   cwdRef.current = cwd
 
   useEffect(() => {
@@ -58,9 +66,14 @@ function usePreviewOpen(source: PreviewRecordSource | ((target: string) => Previ
     }
 
     const current = activePreviewRef.current
+    const isOpen = rightWorkspaceTabsRef.current.some(tab => rightWorkspaceTabMatchesRawTarget(tab, target))
 
-    if (current?.source === target) {
-      dismissPreviewTarget()
+    if (isOpen) {
+      if (current?.source === target) {
+        dismissPreviewTarget()
+      } else {
+        closeRightWorkspaceTabsForRawTarget(target)
+      }
 
       return
     }
@@ -79,12 +92,6 @@ function usePreviewOpen(source: PreviewRecordSource | ((target: string) => Previ
 
       if (!preview) {
         throw new Error(`Could not open preview target: ${target}`)
-      }
-
-      const latest = activePreviewRef.current
-
-      if (latest?.source === preview.source && latest.url === preview.url) {
-        return
       }
 
       const previewSource = typeof source === 'function' ? source(target) : source
@@ -116,10 +123,10 @@ export function PreviewAttachment({
   target: string
 }) {
   const { t } = useI18n()
-  const activePreview = useStore($previewTarget)
+  const rightWorkspaceTabs = useStore($rightWorkspaceTabs)
   const { openTarget, openingTarget } = usePreviewOpen(source)
   const name = previewName(target)
-  const isActive = activePreview?.source === target
+  const isActive = rightWorkspaceTabs.some(tab => rightWorkspaceTabMatchesRawTarget(tab, target))
   const opening = openingTarget === target
 
   return (
