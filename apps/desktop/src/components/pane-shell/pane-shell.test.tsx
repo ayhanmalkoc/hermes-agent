@@ -147,13 +147,13 @@ describe('PaneShell composition', () => {
     expect($paneStates.get().files?.open).toBe(true)
   })
 
-  it('uses widthOverride from the store when set', () => {
+  it('uses widthOverride from the store when set on a resizable pane', () => {
     setPaneOpen('files', true)
     setPaneWidthOverride('files', 320)
 
     const rendered = render(
       <PaneShell>
-        <Pane id="files" side="left" width="240px">
+        <Pane id="files" resizable side="left" width="240px">
           files
         </Pane>
         <PaneMain>main</PaneMain>
@@ -277,6 +277,22 @@ describe('PaneShell composition', () => {
 
     expect(rendered.queryByLabelText('Resize files')).toBeNull()
     expect(rendered.getByLabelText('Resize preview')).toBeDefined()
+  })
+
+  it('ignores stored width overrides when a pane is not resizable', () => {
+    setPaneOpen('inspector', true)
+    setPaneWidthOverride('inspector', 420)
+
+    const rendered = render(
+      <PaneShell>
+        <PaneMain>main</PaneMain>
+        <Pane id="inspector" resizable={false} side="right" width="80vw">
+          inspector
+        </Pane>
+      </PaneShell>
+    )
+
+    expect(getColumnTemplate(gridContainer(rendered))).toEqual(['minmax(0,1fr)', '80vw'])
   })
 
   it('dragging a left-pane separator stores a wider width override', () => {

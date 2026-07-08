@@ -1110,8 +1110,7 @@ export function DesktopController() {
   const sidebarSide = panesFlipped ? 'right' : 'left'
   const railSide = panesFlipped ? 'left' : 'right'
 
-  const railColumnOpen = rightWorkspaceOpen && rightWorkspaceTabs.length > 0
-  const rightWorkspaceExpanded = railColumnOpen && rightWorkspaceSizeMode === 'expanded'
+  const rightWorkspaceExpanded = rightWorkspaceOpen && rightWorkspaceSizeMode === 'expanded'
 
   // Once the terminal would share its rail with another sidebar, drop it to a
   // full-width row beneath them rather than cramming in one more skinny column.
@@ -1125,7 +1124,7 @@ export function DesktopController() {
       key="right-workspace"
       maxWidth={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '42rem'}
       minWidth="22rem"
-      resizable
+      resizable={!rightWorkspaceExpanded}
       side={railSide}
       width={rightWorkspaceExpanded ? 'calc(100vw - var(--pane-chat-sidebar-width, 0px))' : '34rem'}
     >

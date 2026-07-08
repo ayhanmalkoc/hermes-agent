@@ -1038,6 +1038,7 @@ function openExternalUrl(rawUrl) {
 }
 
 const browserWorkspaceViews = new Map()
+const BROWSER_TRANSIENT_LOAD_ERROR_CODES = new Set([-3])
 
 function browserWorkspaceState(id, view, extra = {}) {
   const contents = view?.webContents
@@ -1127,13 +1128,13 @@ function ensureBrowserWorkspaceView(id) {
       event.preventDefault()
     }
   })
-  view.webContents.on('did-start-loading', () => sendBrowserWorkspaceState(key, view, { error: null, loading: true }))
+  view.webContents.on('did-start-loading', () => sendBrowserWorkspaceState(key, view, { error: null, loading: true, url: undefined }))
   view.webContents.on('did-stop-loading', () => sendBrowserWorkspaceState(key, view, { error: null, loading: false }))
   view.webContents.on('did-navigate', (_event, url) => sendBrowserWorkspaceState(key, view, { error: null, loading: false, url }))
   view.webContents.on('did-navigate-in-page', (_event, url) => sendBrowserWorkspaceState(key, view, { error: null, url }))
   view.webContents.on('page-title-updated', (_event, title) => sendBrowserWorkspaceState(key, view, { title }))
   view.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
-    if (isMainFrame && errorCode !== -3) {
+    if (isMainFrame && !BROWSER_TRANSIENT_LOAD_ERROR_CODES.has(errorCode)) {
       sendBrowserWorkspaceState(key, view, {
         error: `${errorDescription || 'Navigation failed'} (${errorCode})`,
         loading: false,
@@ -6783,8 +6784,9 @@ ipcMain.handle('hermes:browser:show', async (_event, id, url) => {
   if (view.webContents.getURL() !== nextUrl) {
     await view.webContents.loadURL(nextUrl)
   }
-  sendBrowserWorkspaceState(id, view, { error: null, url: nextUrl })
-  return { ok: true, url: nextUrl }
+  const currentUrl = view.webContents.getURL() || nextUrl
+  sendBrowserWorkspaceState(id, view, { error: null, url: currentUrl })
+  return { ok: true, url: currentUrl }
 })
 
 ipcMain.handle('hermes:browser:hide', (_event, id) => ({ ok: detachBrowserWorkspaceView(id) }))
@@ -6800,8 +6802,9 @@ ipcMain.handle('hermes:browser:load', async (_event, id, url) => {
   const nextUrl = await normalizeBrowserWorkspaceLoadUrl(url)
   const view = attachBrowserWorkspaceView(id)
   await view.webContents.loadURL(nextUrl)
-  sendBrowserWorkspaceState(id, view, { error: null, url: nextUrl })
-  return { ok: true, url: nextUrl }
+  const currentUrl = view.webContents.getURL() || nextUrl
+  sendBrowserWorkspaceState(id, view, { error: null, url: currentUrl })
+  return { ok: true, url: currentUrl }
 })
 
 ipcMain.handle('hermes:browser:back', (_event, id) => {
