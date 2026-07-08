@@ -30,7 +30,7 @@ export interface PreviewServerRestart {
   url: string
 }
 
-export type PreviewRecordSource = 'explicit-link' | 'file-browser' | 'manual' | 'tool-result'
+export type PreviewRecordSource = 'artifact' | 'explicit-link' | 'file-browser' | 'manual' | 'tool-result'
 
 export interface SessionPreviewRecord {
   autoOpen?: boolean
@@ -159,7 +159,7 @@ function isPreviewRecord(value: unknown): value is SessionPreviewRecord {
     typeof r.id === 'string' &&
     isPreviewTarget(r.normalized) &&
     typeof r.sessionId === 'string' &&
-    ['explicit-link', 'file-browser', 'manual', 'tool-result'].includes(String(r.source)) &&
+    ['artifact', 'explicit-link', 'file-browser', 'manual', 'tool-result'].includes(String(r.source)) &&
     typeof r.target === 'string' &&
     (r.dismissedAt === undefined || typeof r.dismissedAt === 'number')
   )

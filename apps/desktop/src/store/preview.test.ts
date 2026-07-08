@@ -136,6 +136,16 @@ describe('preview store', () => {
     expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
   })
 
+  it('opens artifact HTML files in Browser', () => {
+    const target = previewTarget('/work/artifact.html')
+
+    setCurrentSessionPreviewTarget(target, 'artifact')
+
+    expect($activeRightWorkspaceTab.get()).toMatchObject({ kind: 'browser', url: 'file:///work/artifact.html' })
+    expect($previewTarget.get()).toEqual(withRenderMode(target, 'preview'))
+    expect(getSessionPreviewRecord('session-1')?.normalized).toEqual(withRenderMode(target, 'preview'))
+  })
+
   it('keeps file tabs when a live preview opens', () => {
     const file = previewTarget('/work/file.html')
     const live = previewTarget('/work/live.html')

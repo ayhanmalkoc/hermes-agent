@@ -543,7 +543,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
         const target = await normalizeOrLocalPreviewTarget(artifact.value, artifact.cwd || undefined)
 
         if (target) {
-          setCurrentSessionPreviewTarget(target, 'manual', artifact.value)
+          setCurrentSessionPreviewTarget(target, target.previewKind === 'html' ? 'artifact' : 'manual', artifact.value)
 
           return
         }

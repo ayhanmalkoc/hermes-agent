@@ -18,7 +18,12 @@ import { MESSAGE_PARTS_COMPONENTS } from '@/components/assistant-ui/thread/messa
 import { StreamStallIndicator } from '@/components/assistant-ui/thread/status'
 import { formatMessageTimestamp } from '@/components/assistant-ui/thread/timestamp'
 import { TooltipIconButton } from '@/components/assistant-ui/tooltip-icon-button'
-import { PreviewAttachment, PreviewGroupAttachment } from '@/components/chat/preview-attachment'
+import {
+  FileActionAttachment,
+  FileActionGroupAttachment,
+  PreviewAttachment,
+  PreviewGroupAttachment
+} from '@/components/chat/preview-attachment'
 import { Codicon } from '@/components/ui/codicon'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
@@ -31,6 +36,7 @@ import {
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
 import { GitBranchIcon, Loader2Icon, Volume2Icon, VolumeXIcon, XIcon } from '@/lib/icons'
+import { extractFileActionTargets, mayContainFileActionTarget } from '@/lib/file-action-targets'
 import { extractPreviewTargets, mayContainPreviewTarget } from '@/lib/preview-targets'
 import { useEnterAnimation } from '@/lib/use-enter-animation'
 import { cn } from '@/lib/utils'
@@ -81,6 +87,14 @@ export const AssistantMessage: FC<{
     return pickPreviewTargets(extractPreviewTargets(completedText))
   }, [completedText])
 
+  const fileActionTargets = useMemo(() => {
+    if (!completedText || !mayContainFileActionTarget(completedText)) {
+      return []
+    }
+
+    return pickPreviewTargets(extractFileActionTargets(completedText))
+  }, [completedText])
+
   const getMessageText = useCallback(() => messageContentText(messageRuntime.getState().content), [messageRuntime])
 
   const enterRef = useEnterAnimation(isRunning, `assistant-message:${messageId}`)
@@ -112,6 +126,16 @@ export const AssistantMessage: FC<{
         {previewTargets.length > 1 && (
           <div className="mt-3 flex flex-wrap gap-2">
             <PreviewGroupAttachment source="explicit-link" targets={previewTargets} />
+          </div>
+        )}
+        {fileActionTargets.length === 1 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <FileActionAttachment target={fileActionTargets[0]} />
+          </div>
+        )}
+        {fileActionTargets.length > 1 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <FileActionGroupAttachment targets={fileActionTargets} />
           </div>
         )}
         <MessagePrimitive.Error>
