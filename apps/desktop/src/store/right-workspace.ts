@@ -296,7 +296,7 @@ function buildRightWorkspaceTab(
     selectedPath: input.target?.source ?? existing?.selectedPath ?? null,
     target: input.kind === 'files' || input.kind === 'browser' ? (input.target ?? existing?.target ?? null) : undefined,
     terminalId: input.kind === 'terminal' ? input.terminalId : undefined,
-    url: input.kind === 'browser' ? (input.url ?? existing?.url ?? 'https://example.com') : undefined,
+    url: input.kind === 'browser' ? (input.url ?? existing?.url ?? '') : undefined,
     title: defaultTitle(input),
     treeVisible: existing?.treeVisible ?? (input.kind !== 'terminal')
   }
@@ -443,7 +443,7 @@ export function openTerminalWorkspaceForTerminal(terminalId: string, title = 'Te
 }
 
 export function openBrowserWorkspace(
-  url = 'https://example.com',
+  url = '',
   activate = true,
   options: { ephemeral?: boolean; target?: PreviewTarget | null } = {}
 ): RightWorkspaceTab {

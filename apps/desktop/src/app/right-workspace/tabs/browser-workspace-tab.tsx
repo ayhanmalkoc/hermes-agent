@@ -5,6 +5,8 @@ import { Codicon } from '@/components/ui/codicon'
 import { Tip } from '@/components/ui/tooltip'
 import { updateRightWorkspaceTab, type RightWorkspaceTab } from '@/store/right-workspace'
 
+const BLANK_BROWSER_URL = 'about:blank'
+
 function normalizeHttpUrl(value: string): string | null {
   const raw = value.trim()
   if (!raw) return null
@@ -21,21 +23,23 @@ function normalizeHttpUrl(value: string): string | null {
 
 function normalizeBrowserTargetUrl(value: string): string | null {
   const raw = value.trim()
+  if (!raw || raw === BLANK_BROWSER_URL) return null
   if (/^file:\/\//i.test(raw)) return raw
   return normalizeHttpUrl(raw)
 }
 
 export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   const containerRef = useRef<HTMLDivElement | null>(null)
-  const [draftUrl, setDraftUrl] = useState(tab.url || 'https://example.com')
+  const committedUrl = tab.url || ''
+  const [draftUrl, setDraftUrl] = useState(committedUrl)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [canGoBack, setCanGoBack] = useState(false)
   const [canGoForward, setCanGoForward] = useState(false)
-  const currentUrl = useMemo(() => normalizeBrowserTargetUrl(tab.url || draftUrl) || 'https://example.com/', [draftUrl, tab.url])
+  const currentUrl = useMemo(() => normalizeBrowserTargetUrl(committedUrl), [committedUrl])
 
   useEffect(() => {
-    setDraftUrl(tab.url || 'https://example.com')
+    setDraftUrl(tab.url || '')
     setError(null)
     setLoading(false)
     setCanGoBack(false)
@@ -67,8 +71,16 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
     }
 
     setError(null)
+    if (!currentUrl) {
+      setLoading(false)
+      setCanGoBack(false)
+      setCanGoForward(false)
+      void api.hide(tab.id).catch(() => undefined)
+      return
+    }
+
     const unsubscribe = api.onState?.(tab.id, payload => {
-      if (typeof payload.url === 'string' && payload.url) {
+      if (typeof payload.url === 'string' && payload.url && payload.url !== BLANK_BROWSER_URL) {
         setDraftUrl(payload.url)
         updateRightWorkspaceTab(tab.id, { url: payload.url, title: payload.title || payload.url })
       } else if (payload.title) {
@@ -79,6 +91,7 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       if (typeof payload.canGoForward === 'boolean') setCanGoForward(payload.canGoForward)
       if (payload.error !== undefined) setError(payload.error || null)
     })
+
     void api.show(tab.id, currentUrl).then(() => {
       if (!disposed) {
         setError(null)
@@ -102,7 +115,17 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   }, [currentUrl, tab.id])
 
   const load = (value = draftUrl) => {
-    const next = normalizeBrowserTargetUrl(value)
+    const raw = value.trim()
+    if (!raw || raw === BLANK_BROWSER_URL) {
+      setDraftUrl('')
+      setError(null)
+      setLoading(false)
+      updateRightWorkspaceTab(tab.id, { title: 'Browser', url: '' })
+      void window.hermesDesktop?.browser.hide(tab.id).catch(() => undefined)
+      return
+    }
+
+    const next = normalizeBrowserTargetUrl(raw)
     if (!next) {
       setError('Only http://, https://, and safe file preview URLs are supported.')
       return
@@ -121,7 +144,7 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
         <Tip label="Back"><Button aria-label="Back" className="h-7 w-7" disabled={!canGoBack} onClick={() => void window.hermesDesktop?.browser.back(tab.id)} size="icon-xs" variant="ghost"><Codicon name="arrow-left" size="0.85rem" /></Button></Tip>
         <Tip label="Forward"><Button aria-label="Forward" className="h-7 w-7" disabled={!canGoForward} onClick={() => void window.hermesDesktop?.browser.forward(tab.id)} size="icon-xs" variant="ghost"><Codicon name="arrow-right" size="0.85rem" /></Button></Tip>
         <Tip label={loading ? 'Stop' : 'Reload'}>
-          <Button aria-label={loading ? 'Stop' : 'Reload'} className="h-7 w-7" onClick={() => void (loading ? window.hermesDesktop?.browser.stop(tab.id) : window.hermesDesktop?.browser.reload(tab.id))} size="icon-xs" variant="ghost">
+          <Button aria-label={loading ? 'Stop' : 'Reload'} className="h-7 w-7" disabled={!currentUrl} onClick={() => void (loading ? window.hermesDesktop?.browser.stop(tab.id) : window.hermesDesktop?.browser.reload(tab.id))} size="icon-xs" variant="ghost">
             <Codicon name={loading ? 'debug-stop' : 'refresh'} size="0.85rem" />
           </Button>
         </Tip>
@@ -134,10 +157,22 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
             value={draftUrl}
           />
         </form>
-        <Tip label="Open external"><Button aria-label="Open external" className="h-7 w-7" onClick={() => void window.hermesDesktop?.openExternal(currentUrl)} size="icon-xs" variant="ghost"><Codicon name="link-external" size="0.85rem" /></Button></Tip>
+        <Tip label="Open external"><Button aria-label="Open external" className="h-7 w-7" disabled={!currentUrl} onClick={() => { if (currentUrl) void window.hermesDesktop?.openExternal(currentUrl) }} size="icon-xs" variant="ghost"><Codicon name="link-external" size="0.85rem" /></Button></Tip>
       </div>
       {error && <div className="border-b border-(--ui-stroke-quaternary) px-3 py-1.5 text-xs text-red-400">{error}</div>}
-      <div ref={containerRef} className="min-h-0 flex-1 overflow-hidden bg-black" />
+      <div ref={containerRef} className="relative min-h-0 flex-1 overflow-hidden bg-(--ui-editor-surface-background)">
+        {!currentUrl && (
+          <div className="absolute inset-0 flex items-center justify-center px-6 text-center">
+            <div className="max-w-sm rounded-2xl border border-(--ui-stroke-quaternary) bg-(--ui-sidebar-surface-background)/70 px-6 py-5 shadow-sm">
+              <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-(--ui-stroke-quaternary) bg-(--ui-editor-surface-background)">
+                <Codicon name="globe" size="1.1rem" />
+              </div>
+              <div className="text-sm font-medium text-(--ui-text-primary)">Blank browser</div>
+              <div className="mt-1 text-xs text-muted-foreground">Enter a URL above to open it here.</div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

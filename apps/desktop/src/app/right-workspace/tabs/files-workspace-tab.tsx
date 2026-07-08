@@ -14,6 +14,7 @@ import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import { cn } from '@/lib/utils'
 import { $currentCwd } from '@/store/session'
 import {
+  $rightWorkspaceSizeMode,
   openFilesWorkspaceTargetFromTab,
   toggleRightWorkspaceTabTree,
   updateRightWorkspaceTab,
@@ -136,6 +137,7 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
 
 export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   const currentCwd = useStore($currentCwd).trim()
+  const expanded = useStore($rightWorkspaceSizeMode) === 'expanded'
   const target = tab.target ?? null
   const targetPath = target?.path || target?.source || ''
   const remoteGateway = isDesktopFsRemoteMode()
@@ -195,6 +197,7 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
         <div className={cn('min-w-0 flex-1 overflow-hidden', !target && 'flex')}>
           {target ? (
             <LocalFilePreview
+              expanded={expanded}
               filesMode
               reloadKey={0}
               richPreviewEnabled={showRichPreviewToggle ? (tab.richPreviewEnabled ?? true) : true}

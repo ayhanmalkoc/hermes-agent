@@ -1152,6 +1152,7 @@ function attachBrowserWorkspaceView(id) {
     mainWindow.contentView.addChildView(view)
     view.__hermesAttached = true
   }
+  view.setVisible(true)
   return view
 }
 
@@ -1178,6 +1179,13 @@ function setBrowserWorkspaceBounds(id, bounds) {
     y: Math.round(Number(bounds?.y) || 0)
   }
   view.setBounds(next)
+}
+
+function setBrowserWorkspaceVisible(id, visible) {
+  const view = browserWorkspaceViews.get(String(id || ''))
+  if (!view || view.webContents.isDestroyed()) return false
+  view.setVisible(Boolean(visible))
+  return true
 }
 
 function ensureWslWindowsFonts() {
@@ -6785,6 +6793,8 @@ ipcMain.handle('hermes:browser:setBounds', (_event, id, bounds) => {
   setBrowserWorkspaceBounds(id, bounds)
   return { ok: true }
 })
+
+ipcMain.handle('hermes:browser:setVisible', (_event, id, visible) => ({ ok: setBrowserWorkspaceVisible(id, visible) }))
 
 ipcMain.handle('hermes:browser:load', async (_event, id, url) => {
   const nextUrl = await normalizeBrowserWorkspaceLoadUrl(url)

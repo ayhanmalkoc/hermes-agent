@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     },
     reload: id => ipcRenderer.invoke('hermes:browser:reload', id),
     setBounds: (id, bounds) => ipcRenderer.invoke('hermes:browser:setBounds', id, bounds),
+    setVisible: (id, visible) => ipcRenderer.invoke('hermes:browser:setVisible', id, Boolean(visible)),
     show: (id, url) => ipcRenderer.invoke('hermes:browser:show', id, url),
     stop: id => ipcRenderer.invoke('hermes:browser:stop', id)
   },

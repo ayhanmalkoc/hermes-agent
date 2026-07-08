@@ -301,9 +301,15 @@ const MARKDOWN_COMPONENTS = {
   code: MarkdownCode
 }
 
-function MarkdownPreview({ text }: { text: string }) {
+function MarkdownPreview({ expanded, text }: { expanded?: boolean; text: string }) {
   return (
-    <div className="preview-markdown mx-auto max-w-3xl px-4 py-3 text-sm text-foreground" data-selectable-text="true">
+    <div
+      className={cn(
+        'preview-markdown px-4 py-3 text-sm text-foreground',
+        expanded ? 'w-full max-w-none' : 'mx-auto max-w-3xl'
+      )}
+      data-selectable-text="true"
+    >
       <Streamdown components={MARKDOWN_COMPONENTS} controls={false} mode="static" parseIncompleteMarkdown={false}>
         {text}
       </Streamdown>
@@ -534,12 +540,14 @@ function SourceWrapView({ filePath, language, text }: { filePath: string; langua
 type PreviewViewMode = 'diff' | 'rendered' | 'source'
 
 export function LocalFilePreview({
+  expanded = false,
   filesMode = false,
   reloadKey,
   richPreviewEnabled = true,
   target,
   wordWrapEnabled = true
 }: {
+  expanded?: boolean
   filesMode?: boolean
   reloadKey: number
   richPreviewEnabled?: boolean
@@ -738,7 +746,7 @@ export function LocalFilePreview({
         )}
         <div className="min-h-0 flex-1 overflow-auto">
           {mode === 'rendered' ? (
-            <MarkdownPreview text={state.text} />
+            <MarkdownPreview expanded={expanded} text={state.text} />
           ) : mode === 'diff' ? (
             <FileDiffPanel
               className="mx-0 mb-0 h-full max-h-none"

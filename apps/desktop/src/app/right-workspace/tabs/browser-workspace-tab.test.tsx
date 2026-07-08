@@ -1,5 +1,5 @@
-import { act, render, screen } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $rightWorkspaceTabs } from '@/store/right-workspace'
 
@@ -11,6 +11,10 @@ class ResizeObserverMock {
 }
 
 describe('BrowserWorkspaceTab', () => {
+  afterEach(() => {
+    cleanup()
+  })
+
   beforeEach(() => {
     $rightWorkspaceTabs.set([])
     vi.stubGlobal('ResizeObserver', ResizeObserverMock)
@@ -29,6 +33,7 @@ describe('BrowserWorkspaceTab', () => {
       }),
       reload: vi.fn(async () => ({ ok: true })),
       setBounds: vi.fn(async () => ({ ok: true })),
+      setVisible: vi.fn(async () => ({ ok: true })),
       show: vi.fn(async (_id: string, url: string) => ({ ok: true, url })),
       stop: vi.fn(async () => ({ ok: true }))
     }
@@ -72,5 +77,44 @@ describe('BrowserWorkspaceTab', () => {
     expect((screen.getByLabelText('Browser URL') as HTMLInputElement).value).toBe('https://example.com/next')
     expect(screen.getByLabelText('Back').hasAttribute('disabled')).toBe(false)
     expect(screen.getByLabelText('Forward').hasAttribute('disabled')).toBe(false)
+  })
+
+  it('opens a blank browser without loading example.com', async () => {
+    const browser = {
+      back: vi.fn(async () => ({ ok: true })),
+      forward: vi.fn(async () => ({ ok: true })),
+      hide: vi.fn(async () => ({ ok: true })),
+      load: vi.fn(async (_id: string, url: string) => ({ ok: true, url })),
+      onState: vi.fn(() => vi.fn()),
+      reload: vi.fn(async () => ({ ok: true })),
+      setBounds: vi.fn(async () => ({ ok: true })),
+      setVisible: vi.fn(async () => ({ ok: true })),
+      show: vi.fn(async (_id: string, url: string) => ({ ok: true, url })),
+      stop: vi.fn(async () => ({ ok: true }))
+    }
+
+    Object.defineProperty(window, 'hermesDesktop', {
+      configurable: true,
+      value: { browser, openExternal: vi.fn() }
+    })
+
+    render(
+      <BrowserWorkspaceTab
+        tab={{
+          createdAt: 1,
+          id: 'browser',
+          kind: 'browser',
+          lastActiveAt: 1,
+          title: 'Browser',
+          url: ''
+        }}
+      />
+    )
+
+    expect((screen.getByLabelText('Browser URL') as HTMLInputElement).value).toBe('')
+    expect(screen.getByText('Blank browser')).toBeTruthy()
+    await waitFor(() => expect(browser.hide).toHaveBeenCalledWith('browser'))
+    expect(browser.show).not.toHaveBeenCalled()
+    expect(browser.load).not.toHaveBeenCalled()
   })
 })
