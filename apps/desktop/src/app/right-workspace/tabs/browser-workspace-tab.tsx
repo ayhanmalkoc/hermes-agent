@@ -104,7 +104,6 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       if (payload.error !== undefined) {
         const nextError = payload.error || null
         setError(nextError)
-        if (nextError) void api.setVisible?.(tab.id, false).catch(() => undefined)
       }
     })
 
@@ -124,7 +123,6 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
     }).catch(err => {
       if (!isTransientBrowserError(err)) {
         setError(err instanceof Error ? err.message : String(err))
-        void api.setVisible?.(tab.id, false).catch(() => undefined)
       }
     })
 
@@ -178,7 +176,6 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
     }).catch(err => {
       if (!isTransientBrowserError(err)) {
         setError(err instanceof Error ? err.message : String(err))
-        void window.hermesDesktop?.browser.setVisible?.(tab.id, false).catch(() => undefined)
       }
     }).finally(() => setLoading(false))
   }

@@ -87,7 +87,6 @@ declare global {
         onState?: (id: string, callback: (payload: HermesBrowserState) => void) => () => void
         reload: (id: string) => Promise<{ ok: boolean }>
         setBounds: (id: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<{ ok: boolean }>
-        setVisible: (id: string, visible: boolean) => Promise<{ ok: boolean }>
         show: (id: string, url: string) => Promise<{ ok: boolean; url: string }>
         stop: (id: string) => Promise<{ ok: boolean }>
       }

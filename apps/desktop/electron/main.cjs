@@ -1182,13 +1182,6 @@ function setBrowserWorkspaceBounds(id, bounds) {
   view.setBounds(next)
 }
 
-function setBrowserWorkspaceVisible(id, visible) {
-  const view = browserWorkspaceViews.get(String(id || ''))
-  if (!view || view.webContents.isDestroyed()) return false
-  view.setVisible(Boolean(visible))
-  return true
-}
-
 function ensureWslWindowsFonts() {
   if (!IS_WSL) return
 
@@ -6795,8 +6788,6 @@ ipcMain.handle('hermes:browser:setBounds', (_event, id, bounds) => {
   setBrowserWorkspaceBounds(id, bounds)
   return { ok: true }
 })
-
-ipcMain.handle('hermes:browser:setVisible', (_event, id, visible) => ({ ok: setBrowserWorkspaceVisible(id, visible) }))
 
 ipcMain.handle('hermes:browser:load', async (_event, id, url) => {
   const nextUrl = await normalizeBrowserWorkspaceLoadUrl(url)

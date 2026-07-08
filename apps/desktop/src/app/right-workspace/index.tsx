@@ -95,16 +95,11 @@ function closeTab(tab: RightWorkspaceTab, gateway?: HermesGateway | null): void 
 }
 
 function NewTabMenu() {
-  const activeTab = useStore($activeRightWorkspaceTab)
   const tabs = useStore($rightWorkspaceTabs)
   const reviewOpen = tabs.some(tab => tab.kind === 'review')
-  const setMenuOpen = (open: boolean) => {
-    if (activeTab?.kind !== 'browser') return
-    void window.hermesDesktop?.browser.setVisible?.(activeTab.id, !open).catch(() => undefined)
-  }
 
   return (
-    <DropdownMenu onOpenChange={setMenuOpen}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button aria-label="New tab" className="h-7 w-7 rounded-lg" size="icon-xs" variant="ghost">
           <Codicon name="add" size="0.875rem" />
