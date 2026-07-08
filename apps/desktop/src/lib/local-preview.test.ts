@@ -14,17 +14,23 @@ describe('localPreviewTarget', () => {
     expect(localPreviewTarget('http://localhost:5173/demo')?.url).toBe('http://localhost:5173/demo')
   })
 
-  it('uses fresh gateway preview tickets for remote localhost URLs', async () => {
+  it('uses the remote preview resolver for remote localhost URLs', async () => {
     $connection.set({ mode: 'remote', baseUrl: 'https://100.107.234.45:9119', token: 't' } as never)
+    const api = vi.fn(async () => ({ kind: 'proxy', label: 'demo', url: '/api/preview/proxy/signed/demo' }))
     vi.stubGlobal('window', {
       hermesDesktop: {
-        api: vi.fn(async () => ({ url: '/api/preview/open/ticket/demo' }))
+        api
       }
     })
 
     expect((await normalizeOrLocalPreviewTarget('http://localhost:5173/demo'))?.url).toBe(
-      'https://100.107.234.45:9119/api/preview/open/ticket/demo'
+      'https://100.107.234.45:9119/api/preview/proxy/signed/demo'
     )
+    expect(api).toHaveBeenCalledWith({
+      body: { cwd: undefined, target: 'http://localhost:5173/demo' },
+      method: 'POST',
+      path: '/api/preview/resolve'
+    })
   })
 
   it('does not leak remote file previews as local file URLs', () => {
@@ -36,21 +42,27 @@ describe('localPreviewTarget', () => {
     expect(target?.url).toBe('https://gw/api/files/download?path=%2Fvar%2Flib%2Fhermes%2Fout.html&token=t')
   })
 
-  it('turns remote HTML file previews into browser-safe data URLs', async () => {
+  it('resolves remote HTML file previews to dashboard-served preview URLs', async () => {
     $connection.set({ mode: 'remote', baseUrl: 'https://gw', token: 't' } as never)
     vi.stubGlobal('window', {
       hermesDesktop: {
-        api: vi.fn(async () => ({ binary: false, byteSize: 12, language: 'html', mimeType: 'text/html', text: '<h1>OK</h1>' }))
+        api: vi.fn(async () => ({
+          kind: 'file',
+          label: 'out.html',
+          mime_type: 'text/html',
+          path: '/var/lib/hermes/out.html',
+          url: '/api/preview/file/signed/out.html'
+        }))
       }
     })
 
     const target = await normalizeOrLocalPreviewTarget('/var/lib/hermes/out.html')
 
     expect(target?.previewKind).toBe('html')
-    expect(target?.url).toBe('data:text/html;charset=utf-8,%3Ch1%3EOK%3C%2Fh1%3E')
+    expect(target?.url).toBe('https://gw/api/preview/file/signed/out.html')
   })
 
-  it('turns local HTML file previews into browser-safe data URLs', async () => {
+  it('keeps local HTML file previews on safe file URLs', async () => {
     vi.stubGlobal('window', {
       hermesDesktop: {
         normalizePreviewTarget: vi.fn(async () => ({
@@ -68,6 +80,6 @@ describe('localPreviewTarget', () => {
 
     const target = await normalizeOrLocalPreviewTarget('/tmp/out.html')
 
-    expect(target?.url).toBe('data:text/html;charset=utf-8,%3Ch1%3EOK%3C%2Fh1%3E')
+    expect(target?.url).toBe('file:///tmp/out.html')
   })
 })

@@ -2,6 +2,7 @@ import { useStore } from '@nanostores/react'
 import { type MutableRefObject, useCallback, useEffect } from 'react'
 
 import { gatewayEventCompletedFileDiff } from '@/lib/gateway-events'
+import { normalizeOrLocalPreviewTarget } from '@/lib/local-preview'
 import {
   $previewTarget,
   $sessionPreviewRegistry,
@@ -14,6 +15,7 @@ import {
 } from '@/store/preview'
 import { $currentCwd } from '@/store/session'
 import type { RpcEvent } from '@/types/hermes'
+import type { PreviewTarget } from '@/store/preview'
 
 type EventHandler = (event: RpcEvent) => void
 
@@ -39,6 +41,12 @@ function activePreviewSessionId(
   return selectedStoredSessionId || routedSessionId || activeSessionIdRef.current || ''
 }
 
+function restoredPreviewTarget(target: PreviewTarget): PreviewTarget {
+  return target.kind === 'file' && target.previewKind === 'html'
+    ? { ...target, renderMode: 'preview' }
+    : target
+}
+
 export function usePreviewRouting({
   activeSessionIdRef,
   baseHandleGatewayEvent,
@@ -56,15 +64,35 @@ export function usePreviewRouting({
   // the tool row is the only entry point, so HTML artifacts never pop the rail
   // open on their own.
   useEffect(() => {
+    let cancelled = false
+
     if (currentView !== 'chat' || !previewSessionId) {
       setPreviewTarget(null)
 
-      return
+      return () => {
+        cancelled = true
+      }
     }
 
     const record = getSessionPreviewRecord(previewSessionId)
 
-    setPreviewTarget(record?.normalized ?? null)
+    if (!record) {
+      setPreviewTarget(null)
+
+      return () => {
+        cancelled = true
+      }
+    }
+
+    void normalizeOrLocalPreviewTarget(record.target).then(target => {
+      if (!cancelled) {
+        setPreviewTarget(restoredPreviewTarget(target ?? record.normalized))
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
   }, [currentView, previewRegistry, previewSessionId])
 
   const restartPreviewServer = useCallback(

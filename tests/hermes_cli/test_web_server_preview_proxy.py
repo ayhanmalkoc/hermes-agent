@@ -29,5 +29,43 @@ def test_preview_proxy_rejects_missing_port():
         raise AssertionError('loopback URL without port should be rejected')
 
 
-def test_preview_proxy_open_route_bypasses_dashboard_cookie_gate():
+def test_preview_routes_bypass_dashboard_cookie_gate():
     assert _path_is_public('/api/preview/open/ticket/path/index.html') is True
+    assert _path_is_public('/api/preview/file/signed/index.html') is True
+    assert _path_is_public('/api/preview/proxy/signed/index.html') is True
+
+
+def test_preview_file_resolve_creates_signed_file_url(tmp_path):
+    html = tmp_path / 'index.html'
+    html.write_text('<h1>OK</h1>', encoding='utf-8')
+
+    result = web_server._preview_file_resolve(str(html))
+
+    assert result['kind'] == 'file'
+    assert result['label'] == 'index.html'
+    assert result['url'].startswith('/api/preview/file/')
+    assert result['url'].endswith('/index.html')
+
+
+def test_preview_signed_file_path_stays_under_root(tmp_path):
+    html = tmp_path / 'index.html'
+    html.write_text('<h1>OK</h1>', encoding='utf-8')
+    result = web_server._preview_file_resolve(str(html))
+    preview_id = result['url'].split('/')[4]
+    payload = web_server._preview_read_payload(preview_id, 'file')
+
+    try:
+        web_server._preview_path_under(web_server.Path(payload['root']), '../secret.txt')
+    except Exception as exc:
+        assert getattr(exc, 'status_code', None) == 400
+    else:
+        raise AssertionError('preview path traversal should be rejected')
+
+
+def test_preview_proxy_fetch_closed_server_returns_502():
+    try:
+        web_server._preview_proxy_fetch('http://127.0.0.1:9/preview.html')
+    except Exception as exc:
+        assert getattr(exc, 'status_code', None) == 502
+    else:
+        raise AssertionError('closed preview server should return a typed 502')

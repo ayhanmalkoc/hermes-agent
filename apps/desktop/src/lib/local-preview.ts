@@ -104,51 +104,70 @@ function isLocalPreviewUrl(raw: string): boolean {
   }
 }
 
-function remoteGatewayUrl(raw: string): string {
-  if (!isDesktopFsRemoteMode() || !isLocalPreviewUrl(raw)) {
-    return raw
-  }
-
-  const conn = $connection.get()
-
-  if (!conn?.baseUrl) {
-    return raw
-  }
-
-  try {
-    const target = new URL(raw)
-    const gateway = new URL(conn.baseUrl)
-
-    target.protocol = gateway.protocol
-    target.hostname = gateway.hostname
-
-    return target.toString()
-  } catch {
-    return raw
-  }
+interface RemotePreviewResolveResult {
+  kind: 'file' | 'proxy' | 'url'
+  label?: string
+  mime_type?: string
+  path?: string
+  source?: string
+  url: string
 }
 
-async function remoteGatewayPreviewProxyUrl(raw: string): Promise<string | null> {
-  if (!isDesktopFsRemoteMode() || !isLocalPreviewUrl(raw)) {
+function isHtmlFileTarget(rawTarget: string): boolean {
+  const raw = rawTarget.trim().replace(/^`|`$/g, '')
+  if (/^https?:\/\//i.test(raw)) {
+    return false
+  }
+  const path = /^file:\/\//i.test(raw) ? raw.replace(/^file:\/\//i, '') : raw
+
+  return HTML_EXTENSIONS.has(extension(path))
+}
+
+function shouldResolveRemotePreview(rawTarget: string): boolean {
+  if (!isDesktopFsRemoteMode()) {
+    return false
+  }
+
+  const raw = rawTarget.trim()
+
+  return (/^https?:\/\//i.test(raw) && isLocalPreviewUrl(raw)) || isHtmlFileTarget(raw)
+}
+
+async function resolveRemotePreviewTarget(rawTarget: string, cwd?: string | null): Promise<PreviewTarget | null> {
+  const baseUrl = $connection.get()?.baseUrl
+
+  if (!baseUrl) {
     return null
   }
 
-  try {
-    const result = await window.hermesDesktop?.api<{ url: string }>({
-      body: { url: raw },
-      method: 'POST',
-      path: '/api/preview/tickets'
-    })
-    const baseUrl = $connection.get()?.baseUrl
+  const result = await window.hermesDesktop?.api<RemotePreviewResolveResult>({
+    body: { cwd: cwd || undefined, target: rawTarget },
+    method: 'POST',
+    path: '/api/preview/resolve'
+  })
 
-    if (!result?.url || !baseUrl) {
-      return null
+  if (!result?.url) {
+    return null
+  }
+
+  const url = /^https?:\/\//i.test(result.url) ? result.url : new URL(result.url, baseUrl).toString()
+
+  if (result.kind === 'file') {
+    const path = result.path || rawTarget
+
+    return {
+      kind: 'file',
+      label: result.label || basename(path),
+      language: 'html',
+      mimeType: result.mime_type,
+      path,
+      previewKind: 'html',
+      source: rawTarget,
+      url
     }
-
-    return new URL(result.url, baseUrl).toString()
-  } catch {
-    return null
   }
+
+  return { kind: 'url', label: result.label || basename(rawTarget), source: rawTarget, url }
 }
 
 export function localPreviewTarget(rawTarget: string, cwd?: string | null): PreviewTarget | null {
@@ -159,9 +178,7 @@ export function localPreviewTarget(rawTarget: string, cwd?: string | null): Prev
   }
 
   if (/^https?:\/\//i.test(raw)) {
-    const url = remoteGatewayUrl(raw)
-
-    return { kind: 'url', label: basename(url), source: raw, url }
+    return { kind: 'url', label: basename(raw), source: raw, url: raw }
   }
 
   let path = raw
@@ -212,18 +229,13 @@ async function enrichPreviewTarget(target: PreviewTarget | null): Promise<Previe
   try {
     const result = await readDesktopFileText(target.path || target.source)
 
-    const htmlDataUrl = target.previewKind === 'html' && !result.binary
-      ? `data:text/html;charset=utf-8,${encodeURIComponent(result.text)}`
-      : null
-
     return {
       ...target,
       binary: result.binary,
       byteSize: result.byteSize,
       language: result.language || target.language,
       large: false,
-      mimeType: result.mimeType,
-      url: htmlDataUrl || target.url
+      mimeType: result.mimeType
     }
   } catch {
     return target
@@ -236,12 +248,8 @@ export async function normalizeOrLocalPreviewTarget(
 ): Promise<PreviewTarget | null> {
   const raw = rawTarget.trim()
 
-  if (/^https?:\/\//i.test(raw)) {
-    const proxied = await remoteGatewayPreviewProxyUrl(raw)
-
-    if (proxied) {
-      return { kind: 'url', label: basename(raw), source: raw, url: proxied }
-    }
+  if (shouldResolveRemotePreview(raw)) {
+    return resolveRemotePreviewTarget(rawTarget, cwd)
   }
 
   if (isDesktopFsRemoteMode() && !/^https?:\/\//i.test(rawTarget.trim())) {

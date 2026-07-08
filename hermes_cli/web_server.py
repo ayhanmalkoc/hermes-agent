@@ -16,6 +16,7 @@ import base64
 import binascii
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 import hmac
 import importlib.util
 import json
@@ -573,7 +574,7 @@ async def auth_middleware(request: Request, call_next):
     if getattr(request.app.state, "auth_required", False):
         return await call_next(request)
     path = request.url.path
-    if path.startswith("/api/preview/open/"):
+    if path.startswith("/api/preview/file/") or path.startswith("/api/preview/open/") or path.startswith("/api/preview/proxy/"):
         return await call_next(request)
     if path.startswith("/api/") and path not in _PUBLIC_API_PATHS:
         if not _has_valid_session_token(request) and not _has_valid_query_token(request, path):
@@ -1168,6 +1169,142 @@ class PreviewProxyTicketRequest(BaseModel):
     url: str
 
 
+class PreviewResolveRequest(BaseModel):
+    target: str
+    cwd: Optional[str] = None
+
+
+_HTML_PREVIEW_EXTENSIONS = {".htm", ".html"}
+
+
+def _preview_b64_encode(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).decode("ascii").rstrip("=")
+
+
+def _preview_b64_decode(data: str) -> bytes:
+    padded = data + "=" * (-len(data) % 4)
+    return base64.urlsafe_b64decode(padded.encode("ascii"))
+
+
+def _preview_sign_payload(payload: dict[str, Any]) -> str:
+    body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    sig = hmac.new(_SESSION_TOKEN.encode("utf-8"), body, hashlib.sha256).digest()
+    return f"{_preview_b64_encode(body)}.{_preview_b64_encode(sig)}"
+
+
+def _preview_read_payload(preview_id: str, expected_kind: str) -> dict[str, Any]:
+    try:
+        body_part, sig_part = str(preview_id or "").split(".", 1)
+        body = _preview_b64_decode(body_part)
+        sig = _preview_b64_decode(sig_part)
+    except (ValueError, TypeError, binascii.Error):
+        raise HTTPException(status_code=404, detail="Preview not found")
+
+    expected = hmac.new(_SESSION_TOKEN.encode("utf-8"), body, hashlib.sha256).digest()
+    if not hmac.compare_digest(sig, expected):
+        raise HTTPException(status_code=404, detail="Preview not found")
+
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (TypeError, ValueError, json.JSONDecodeError):
+        raise HTTPException(status_code=404, detail="Preview not found")
+
+    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("kind") != expected_kind:
+        raise HTTPException(status_code=404, detail="Preview not found")
+
+    return payload
+
+
+def _preview_path_under(root: Path, rel_path: str) -> Path:
+    raw = urllib.parse.unquote(str(rel_path or "")).lstrip("/")
+    if not raw:
+        raise HTTPException(status_code=400, detail="Preview path is required")
+    candidate = Path(raw)
+    if candidate.is_absolute() or ".." in candidate.parts:
+        raise HTTPException(status_code=400, detail="Invalid preview path")
+    target = (root / candidate).resolve(strict=False)
+    if not _path_is_under(root, target):
+        raise HTTPException(status_code=403, detail="Path outside preview root")
+    return target
+
+
+def _preview_file_target(raw_target: str, cwd: str | None = None) -> Path:
+    raw = str(raw_target or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Preview target is required")
+    if cwd and not raw.lower().startswith("file:") and not Path(raw).expanduser().is_absolute():
+        raw = str(Path(cwd).expanduser() / raw)
+    target, _st = _fs_regular_file(_fs_path(raw))
+    if target.suffix.lower() not in _HTML_PREVIEW_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="Only HTML files can be rendered in Browser preview")
+    return target
+
+
+def _preview_file_resolve(raw_target: str, cwd: str | None = None) -> dict[str, Any]:
+    target = _preview_file_target(raw_target, cwd)
+    root = target.parent.resolve(strict=False)
+    payload = {
+        "kind": "file",
+        "root": str(root),
+        "source": str(raw_target or ""),
+        "v": 1,
+    }
+    preview_id = _preview_sign_payload(payload)
+    entry = urllib.parse.quote(target.name)
+    return {
+        "kind": "file",
+        "label": target.name,
+        "mime_type": _fs_mime_type(target),
+        "path": str(target),
+        "url": f"/api/preview/file/{preview_id}/{entry}",
+    }
+
+
+def _preview_proxy_resolve(raw_url: str) -> dict[str, Any]:
+    parsed = _preview_proxy_target(raw_url)
+    base = parsed._replace(path="", params="", query="", fragment="")
+    payload = {
+        "base": urllib.parse.urlunparse(base),
+        "kind": "proxy",
+        "source": str(raw_url or ""),
+        "v": 1,
+    }
+    preview_id = _preview_sign_payload(payload)
+    path = parsed.path.lstrip("/") or ""
+    if not path:
+        path = ""
+    url = f"/api/preview/proxy/{preview_id}/{path}"
+    if parsed.query:
+        url = f"{url}?{parsed.query}"
+    return {
+        "kind": "proxy",
+        "label": Path(parsed.path).name or parsed.netloc,
+        "source": str(raw_url or ""),
+        "url": url,
+    }
+
+
+def _preview_is_loopback_url(raw: str) -> bool:
+    try:
+        _preview_proxy_target(raw)
+        return True
+    except HTTPException:
+        return False
+
+
+@app.post("/api/preview/resolve")
+async def resolve_preview_target(payload: PreviewResolveRequest, request: Request):
+    _require_token(request)
+    raw = str(payload.target or "").strip()
+    if not raw:
+        raise HTTPException(status_code=400, detail="Preview target is required")
+    if raw.lower().startswith(("http://", "https://")):
+        if _preview_is_loopback_url(raw):
+            return _preview_proxy_resolve(raw)
+        return {"kind": "url", "label": raw, "source": raw, "url": raw}
+    return _preview_file_resolve(raw, payload.cwd)
+
+
 def _preview_proxy_target(raw_url: str) -> urllib.parse.ParseResult:
     parsed = urllib.parse.urlparse(str(raw_url or "").strip())
     if parsed.scheme not in {"http", "https"}:
@@ -1190,10 +1327,22 @@ def _preview_proxy_sweep(now: float | None = None) -> None:
 
 def _preview_proxy_fetch(url: str) -> tuple[bytes, str, int]:
     req = urllib.request.Request(url, headers={"User-Agent": "Hermes-Preview-Proxy"})
-    with urllib.request.urlopen(req, timeout=10) as response:
-        status = int(getattr(response, "status", 200))
-        content_type = response.headers.get("content-type", "application/octet-stream")
-        body = response.read(_PREVIEW_PROXY_MAX_BYTES + 1)
+    try:
+        with urllib.request.urlopen(req, timeout=10) as response:
+            status = int(getattr(response, "status", 200))
+            content_type = response.headers.get("content-type", "application/octet-stream")
+            body = response.read(_PREVIEW_PROXY_MAX_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        status = int(getattr(exc, "code", 502) or 502)
+        content_type = exc.headers.get("content-type", "text/plain") if exc.headers else "text/plain"
+        body = exc.read(_PREVIEW_PROXY_MAX_BYTES + 1)
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Preview server timed out")
+    except urllib.error.URLError as exc:
+        reason = getattr(exc, "reason", None)
+        if isinstance(reason, TimeoutError):
+            raise HTTPException(status_code=504, detail="Preview server timed out")
+        raise HTTPException(status_code=502, detail="Preview server unavailable")
     if len(body) > _PREVIEW_PROXY_MAX_BYTES:
         raise HTTPException(status_code=413, detail="Preview response too large")
     return body, content_type, status
@@ -1223,6 +1372,28 @@ async def open_preview_proxy(ticket: str, path: str, request: Request):
         raise HTTPException(status_code=404, detail="Preview ticket expired")
     base = urllib.parse.urlparse(str(data["target"]))
     requested_path = "/" + path
+    query = request.url.query
+    url = urllib.parse.urlunparse(base._replace(path=requested_path, query=query))
+    body, content_type, status = await asyncio.to_thread(_preview_proxy_fetch, url)
+    return Response(content=body, status_code=status, media_type=content_type)
+
+
+@app.get("/api/preview/file/{preview_id}/{path:path}")
+async def open_signed_file_preview(preview_id: str, path: str):
+    payload = _preview_read_payload(preview_id, "file")
+    root = _fs_path(str(payload.get("root") or ""))
+    target = _preview_path_under(root, path)
+    target, _st = _fs_regular_file(target)
+    return FileResponse(path=str(target), media_type=_fs_mime_type(target))
+
+
+@app.get("/api/preview/proxy/{preview_id}/{path:path}")
+async def open_signed_proxy_preview(preview_id: str, path: str, request: Request):
+    payload = _preview_read_payload(preview_id, "proxy")
+    base = urllib.parse.urlparse(str(payload.get("base") or ""))
+    if base.scheme not in {"http", "https"} or base.hostname not in {"127.0.0.1", "::1"} or not base.port:
+        raise HTTPException(status_code=400, detail="Unsupported preview target")
+    requested_path = "/" + path.lstrip("/")
     query = request.url.query
     url = urllib.parse.urlunparse(base._replace(path=requested_path, query=query))
     body, content_type, status = await asyncio.to_thread(_preview_proxy_fetch, url)
