@@ -32,6 +32,7 @@ import { useTheme } from '@/themes'
 import { AttachmentList } from './attachments'
 import {
   COMPOSER_FADE_BACKGROUND,
+  composerVisibleStatusSessionId,
   type QueueEditState,
   slashArgStage
 } from './composer-utils'
@@ -107,14 +108,14 @@ export function ChatBar({
   const awaitingInput = useStore($activeSessionAwaitingInput)
   const activeQueueSessionKey = queueSessionKey || sessionId || null
 
-  // Status items (subagents, background processes) are keyed by the RUNTIME
-  // session id — gateway events and process.list both speak that id. Only the
-  // queue uses the stored-session fallback key (prompts can queue pre-resume).
-  const statusSessionId = sessionId ?? null
+  // Composer-visible status belongs to the session the user is looking at.
+  // The runtime session can remain active while the sidebar shows another stored
+  // chat; using it here would leak preview/status chips across conversations.
+  const visibleSessionId = composerVisibleStatusSessionId(storedSessionId, sessionId)
 
   // Coarse edge: re-renders ChatBar only when the stack shows/hides, NOT on
   // every per-item status mutation or other sessions' churn (see the hook).
-  const statusPresent = useSessionStatusPresence(statusSessionId)
+  const statusPresent = useSessionStatusPresence(visibleSessionId)
 
   const composerRef = useRef<HTMLFormElement | null>(null)
   const composerSurfaceRef = useRef<HTMLDivElement | null>(null)
@@ -925,7 +926,7 @@ export function ChatBar({
                     />
                   ) : null
                 }
-                sessionId={statusSessionId}
+                sessionId={visibleSessionId}
               />
               <AgentProfileRail className="mx-auto mb-1" onClose={() => setAgentRailOpen(false)} open={agentRailOpen} />
             </div>

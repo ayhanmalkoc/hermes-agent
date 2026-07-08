@@ -58,3 +58,10 @@ export interface QueueEditState {
 }
 
 export const cloneAttachments = (attachments: ComposerAttachment[]) => attachments.map(a => ({ ...a }))
+
+export function composerVisibleStatusSessionId(
+  storedSessionId: null | string | undefined,
+  runtimeSessionId: null | string | undefined
+): null | string {
+  return storedSessionId || runtimeSessionId || null
+}
