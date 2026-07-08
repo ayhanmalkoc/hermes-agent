@@ -47,6 +47,30 @@ def test_preview_file_resolve_creates_signed_file_url(tmp_path):
     assert result['url'].endswith('/index.html')
 
 
+def test_preview_file_resolve_blocks_sensitive_files(tmp_path):
+    env_file = tmp_path / '.env.html'
+    env_file.write_text('<h1>secret</h1>', encoding='utf-8')
+
+    try:
+        web_server._preview_file_resolve(str(env_file))
+    except Exception as exc:
+        assert getattr(exc, 'status_code', None) == 403
+    else:
+        raise AssertionError('sensitive file preview should be blocked')
+
+
+def test_fs_regular_file_blocks_sensitive_files(tmp_path):
+    key_file = tmp_path / 'id_rsa'
+    key_file.write_text('secret', encoding='utf-8')
+
+    try:
+        web_server._fs_regular_file(key_file)
+    except Exception as exc:
+        assert getattr(exc, 'status_code', None) == 403
+    else:
+        raise AssertionError('sensitive file reads should be blocked')
+
+
 def test_preview_signed_file_path_stays_under_root(tmp_path):
     html = tmp_path / 'index.html'
     html.write_text('<h1>OK</h1>', encoding='utf-8')

@@ -30,19 +30,12 @@ const SIDEBAR_DISMISSED_AUTO_PROJECTS_STORAGE_KEY = 'hermes.desktop.dismissedAut
 const SIDEBAR_DISMISSED_WORKTREES_STORAGE_KEY = 'hermes.desktop.dismissedWorktrees'
 const PANES_FLIPPED_STORAGE_KEY = 'hermes.desktop.panesFlipped'
 export const CHAT_SIDEBAR_PANE_ID = 'chat-sidebar'
-export const FILE_BROWSER_PANE_ID = 'file-browser'
 
 ensurePaneRegistered(CHAT_SIDEBAR_PANE_ID, { open: true })
-ensurePaneRegistered(FILE_BROWSER_PANE_ID, { open: false })
 
 export const $sidebarOpen: ReadableAtom<boolean> = computed(
   $paneStates,
   states => states[CHAT_SIDEBAR_PANE_ID]?.open ?? true
-)
-
-export const $fileBrowserOpen: ReadableAtom<boolean> = computed(
-  $paneStates,
-  states => states[FILE_BROWSER_PANE_ID]?.open ?? false
 )
 
 export const $sidebarWidth: ReadableAtom<number> = computed($paneStates, states => {
@@ -176,21 +169,12 @@ export function toggleSidebarOpen() {
   togglePane(CHAT_SIDEBAR_PANE_ID)
 }
 
-export function toggleFileBrowserOpen() {
-  togglePane(FILE_BROWSER_PANE_ID)
-}
-
-export function setFileBrowserOpen(open: boolean) {
-  setPaneOpen(FILE_BROWSER_PANE_ID, open)
-}
-
 // "Reveal this file in the file-browser tree" — an absolute path the tree
 // subscribes to, expanding ancestor folders and selecting/scrolling to it. Reset
 // to null by the tree once consumed.
 export const $revealInTreeRequest = atom<null | string>(null)
 
 export function revealFileInTree(path: string): void {
-  setFileBrowserOpen(true)
   $revealInTreeRequest.set(path)
 }
 

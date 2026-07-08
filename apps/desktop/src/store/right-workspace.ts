@@ -16,6 +16,7 @@ export interface RightWorkspaceTab {
   id: string
   kind: RightWorkspaceTabKind
   title: string
+  ephemeral?: boolean
   terminalId?: string
   url?: string
   target?: PreviewTarget | null
@@ -30,6 +31,7 @@ export interface RightWorkspaceTab {
 
 export interface OpenRightWorkspaceTabInput {
   activate?: boolean
+  ephemeral?: boolean
   kind: RightWorkspaceTabKind
   target?: PreviewTarget | null
   terminalId?: string
@@ -200,7 +202,7 @@ function targetTitle(target: PreviewTarget | null | undefined): string {
 }
 
 function targetKey(target: PreviewTarget): string {
-  return `${target.kind}:${target.url}`
+  return [target.kind, target.url, target.source, target.renderMode, target.previewKind].filter(Boolean).join(':')
 }
 
 function filesTabId(target: PreviewTarget | null | undefined): string {
@@ -259,6 +261,7 @@ function buildRightWorkspaceTab(
 ): RightWorkspaceTab {
   return {
     createdAt: existing?.createdAt ?? timestamp,
+    ephemeral: input.ephemeral ?? existing?.ephemeral,
     id,
     kind: input.kind,
     lastActiveAt: timestamp,
@@ -289,9 +292,8 @@ export function openRightWorkspaceTab(input: OpenRightWorkspaceTabInput): RightW
 
   if (input.activate !== false) {
     $activeRightWorkspaceTabId.set(id)
+    setRightWorkspaceOpen(true)
   }
-
-  setRightWorkspaceOpen(true)
 
   return nextTab
 }
@@ -369,8 +371,8 @@ export function toggleRightWorkspaceTabTree(id: string): void {
   updateRightWorkspaceTab(id, { treeVisible: !tab.treeVisible })
 }
 
-export function openFilesWorkspaceTarget(target: PreviewTarget): RightWorkspaceTab {
-  return openRightWorkspaceTab({ kind: 'files', target })
+export function openFilesWorkspaceTarget(target: PreviewTarget, options: { ephemeral?: boolean } = {}): RightWorkspaceTab {
+  return openRightWorkspaceTab({ ephemeral: options.ephemeral, kind: 'files', target })
 }
 
 export function openFilesWorkspaceTargetFromTab(sourceTabId: string, target: PreviewTarget): RightWorkspaceTab {
@@ -415,8 +417,18 @@ export function openTerminalWorkspaceForTerminal(terminalId: string, title = 'Te
   return openRightWorkspaceTab({ activate, kind: 'terminal', terminalId, title })
 }
 
-export function openBrowserWorkspace(url = 'https://example.com', activate = true): RightWorkspaceTab {
-  return openRightWorkspaceTab({ activate, kind: 'browser', title: 'Browser', url })
+export function openBrowserWorkspace(url = 'https://example.com', activate = true, options: { ephemeral?: boolean } = {}): RightWorkspaceTab {
+  return openRightWorkspaceTab({ activate, ephemeral: options.ephemeral, kind: 'browser', title: 'Browser', url })
+}
+
+export function closeEphemeralRightWorkspaceTabsForTarget(target: PreviewTarget): void {
+  const key = targetKey(target)
+  const current = $rightWorkspaceTabs.get()
+  const ephemeralTabs = current.filter(tab => tab.ephemeral && (tab.target ? targetKey(tab.target) === key : tab.url === target.url))
+
+  for (const tab of ephemeralTabs) {
+    closeRightWorkspaceTab(tab.id)
+  }
 }
 
 export function closeActiveRightWorkspaceTab(): void {

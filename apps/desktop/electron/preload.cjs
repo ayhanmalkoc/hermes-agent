@@ -63,8 +63,6 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     }
   },
   normalizePreviewTarget: (target, baseDir) => ipcRenderer.invoke('hermes:normalizePreviewTarget', target, baseDir),
-  watchPreviewFile: url => ipcRenderer.invoke('hermes:watchPreviewFile', url),
-  stopPreviewFileWatch: id => ipcRenderer.invoke('hermes:stopPreviewFileWatch', id),
   setTitleBarTheme: payload => ipcRenderer.send('hermes:titlebar-theme', payload),
   setNativeTheme: mode => ipcRenderer.send('hermes:native-theme', mode),
   setTranslucency: payload => ipcRenderer.send('hermes:translucency', payload),
@@ -75,6 +73,13 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     forward: id => ipcRenderer.invoke('hermes:browser:forward', id),
     hide: id => ipcRenderer.invoke('hermes:browser:hide', id),
     load: (id, url) => ipcRenderer.invoke('hermes:browser:load', id, url),
+    onState: (id, callback) => {
+      const listener = (_event, payload) => {
+        if (payload?.id === id) callback(payload)
+      }
+      ipcRenderer.on('hermes:browser:state', listener)
+      return () => ipcRenderer.removeListener('hermes:browser:state', listener)
+    },
     reload: id => ipcRenderer.invoke('hermes:browser:reload', id),
     setBounds: (id, bounds) => ipcRenderer.invoke('hermes:browser:setBounds', id, bounds),
     show: (id, url) => ipcRenderer.invoke('hermes:browser:show', id, url),
@@ -169,11 +174,6 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     const listener = (_event, payload) => callback(payload)
     ipcRenderer.on('hermes:notification-action', listener)
     return () => ipcRenderer.removeListener('hermes:notification-action', listener)
-  },
-  onPreviewFileChanged: callback => {
-    const listener = (_event, payload) => callback(payload)
-    ipcRenderer.on('hermes:preview-file-changed', listener)
-    return () => ipcRenderer.removeListener('hermes:preview-file-changed', listener)
   },
   onBackendExit: callback => {
     const listener = (_event, payload) => callback(payload)

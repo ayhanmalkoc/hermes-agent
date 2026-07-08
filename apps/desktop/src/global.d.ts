@@ -74,8 +74,6 @@ declare global {
       saveClipboardImage: () => Promise<string>
       getPathForFile: (file: File) => string
       normalizePreviewTarget: (target: string, baseDir?: string) => Promise<HermesPreviewTarget | null>
-      watchPreviewFile: (url: string) => Promise<HermesPreviewWatch>
-      stopPreviewFileWatch: (id: string) => Promise<boolean>
       setTitleBarTheme?: (payload: HermesTitleBarTheme) => void
       setNativeTheme?: (mode: 'dark' | 'light' | 'system') => void
       setTranslucency?: (payload: { intensity: number }) => void
@@ -86,6 +84,7 @@ declare global {
         forward: (id: string) => Promise<{ ok: boolean }>
         hide: (id: string) => Promise<{ ok: boolean }>
         load: (id: string, url: string) => Promise<{ ok: boolean; url: string }>
+        onState?: (id: string, callback: (payload: HermesBrowserState) => void) => () => void
         reload: (id: string) => Promise<{ ok: boolean }>
         setBounds: (id: string, bounds: { x: number; y: number; width: number; height: number }) => Promise<{ ok: boolean }>
         show: (id: string, url: string) => Promise<{ ok: boolean; url: string }>
@@ -175,7 +174,6 @@ declare global {
       onWindowStateChanged?: (callback: (payload: HermesWindowState) => void) => () => void
       onFocusSession?: (callback: (sessionId: string) => void) => () => void
       onNotificationAction?: (callback: (payload: { actionId: string; sessionId?: string }) => void) => () => void
-      onPreviewFileChanged: (callback: (payload: HermesPreviewFileChanged) => void) => () => void
       onBackendExit: (callback: (payload: BackendExit) => void) => () => void
       onPowerResume?: (callback: () => void) => () => void
       onBootProgress: (callback: (payload: DesktopBootProgress) => void) => () => void
@@ -207,6 +205,16 @@ declare global {
       }
     }
   }
+}
+
+interface HermesBrowserState {
+  canGoBack?: boolean
+  canGoForward?: boolean
+  error?: string | null
+  id: string
+  loading?: boolean
+  title?: string
+  url?: string
 }
 
 export interface DesktopMarketplaceSearchItem {
@@ -552,7 +560,7 @@ export interface HermesPreviewTarget {
   language?: string
   mimeType?: string
   path?: string
-  previewKind?: 'binary' | 'html' | 'image' | 'text'
+  previewKind?: 'audio' | 'binary' | 'html' | 'image' | 'text' | 'video'
   renderMode?: 'preview' | 'source'
   source: string
   url: string
@@ -566,11 +574,6 @@ export interface HermesReadFileTextResult {
   path: string
   text: string
   truncated?: boolean
-}
-
-export interface HermesPreviewWatch {
-  id: string
-  path: string
 }
 
 // A real git worktree as reported by `git worktree list` (source of truth for
@@ -672,12 +675,6 @@ export interface HermesReadDirEntry {
 export interface HermesReadDirResult {
   entries: HermesReadDirEntry[]
   error?: string
-}
-
-export interface HermesPreviewFileChanged {
-  id: string
-  path: string
-  url: string
 }
 
 export interface HermesSelectPathsOptions {

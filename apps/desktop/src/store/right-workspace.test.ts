@@ -4,13 +4,16 @@ import {
   $activeRightWorkspaceTabId,
   $rightWorkspaceSizeMode,
   $rightWorkspaceTabs,
+  closeEphemeralRightWorkspaceTabsForTarget,
   openBrowserWorkspace,
+  openFilesWorkspaceTarget,
   openReviewWorkspace,
   openTerminalWorkspaceForTerminal,
   pruneRightWorkspaceTerminalTabs,
   setRightWorkspaceScope,
   toggleRightWorkspaceSize
 } from './right-workspace'
+import { $paneOpen, setPaneOpen } from './panes'
 
 describe('right workspace session scope', () => {
   beforeEach(() => {
@@ -19,6 +22,7 @@ describe('right workspace session scope', () => {
     $rightWorkspaceTabs.set([])
     $activeRightWorkspaceTabId.set(null)
     $rightWorkspaceSizeMode.set('normal')
+    setPaneOpen('right-workspace', false)
   })
 
   it('isolates tabs, active tab, and size mode per session scope', () => {
@@ -69,5 +73,48 @@ describe('right workspace session scope', () => {
       { id: 'browser:https://example.com/demo', kind: 'browser', url: 'https://example.com/demo' }
     ])
     expect($activeRightWorkspaceTabId.get()).toBe('browser:https://example.com/demo')
+  })
+
+  it('does not force-open the pane for inactive tab updates', () => {
+    openBrowserWorkspace('https://example.com/background', false)
+
+    expect($paneOpen('right-workspace').get()).toBe(false)
+    expect($activeRightWorkspaceTabId.get()).toBeNull()
+  })
+
+  it('keeps file tabs distinct by render mode and source', () => {
+    const base = {
+      kind: 'file' as const,
+      label: 'index.html',
+      previewKind: 'html' as const,
+      source: '/tmp/index.html',
+      url: 'file:///tmp/index.html'
+    }
+
+    openFilesWorkspaceTarget({ ...base, renderMode: 'source' })
+    openFilesWorkspaceTarget({ ...base, renderMode: 'preview' })
+
+    expect($rightWorkspaceTabs.get().map(tab => tab.id)).toEqual([
+      'files:file:file:///tmp/index.html:/tmp/index.html:source:html',
+      'files:file:file:///tmp/index.html:/tmp/index.html:preview:html'
+    ])
+  })
+
+  it('closes only matching ephemeral preview tabs', () => {
+    const target = {
+      kind: 'file' as const,
+      label: 'report.html',
+      previewKind: 'html' as const,
+      renderMode: 'preview' as const,
+      source: '/tmp/report.html',
+      url: 'https://gateway/api/preview/file/id/report.html'
+    }
+
+    openFilesWorkspaceTarget(target, { ephemeral: true })
+    openBrowserWorkspace('https://example.com/manual')
+
+    closeEphemeralRightWorkspaceTabsForTarget(target)
+
+    expect($rightWorkspaceTabs.get()).toMatchObject([{ kind: 'browser', url: 'https://example.com/manual' }])
   })
 })

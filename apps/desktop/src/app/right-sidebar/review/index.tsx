@@ -16,8 +16,6 @@ import { DiffCount } from '@/components/ui/diff-count'
 import { Tip } from '@/components/ui/tooltip'
 import { useDelayedTrue } from '@/hooks/use-delayed-true'
 import { useI18n } from '@/i18n'
-import { cn } from '@/lib/utils'
-import { $panesFlipped } from '@/store/layout'
 import { notifyError } from '@/store/notifications'
 import {
   $reviewDiff,
@@ -40,7 +38,7 @@ import {
 } from '@/store/review'
 
 import { SidebarPanelLabel } from '../../shell/sidebar-label'
-import { PaneEmptyState, RightSidebarSectionHeader } from '../index'
+import { PaneEmptyState, RightWorkspaceSectionHeader } from '../../right-workspace/shared/pane-parts'
 
 import { ReviewFileTree } from './file-tree'
 import { ReviewShipBar } from './ship-bar'
@@ -52,7 +50,6 @@ const ACTION_BTN = 'size-5'
 export function ReviewPane() {
   const { t } = useI18n()
   const c = t.statusStack.coding
-  const panesFlipped = useStore($panesFlipped)
   const files = useStore($reviewFiles)
   const loading = useStore($reviewLoading)
   const isRepo = useStore($reviewIsRepo)
@@ -72,17 +69,12 @@ export function ReviewPane() {
   const showDiffSkeleton = useDelayedTrue(diffLoading)
 
   return (
-    <aside
+    <div
       aria-label={c.review}
-      className={cn(
-        'before:pointer-events-none relative flex h-full w-full min-w-0 flex-col overflow-hidden border-(--ui-stroke-secondary) bg-(--ui-sidebar-surface-background) pt-(--titlebar-height) text-(--ui-text-tertiary)',
-        panesFlipped
-          ? 'border-r shadow-[inset_-0.0625rem_0_0_color-mix(in_srgb,white_18%,transparent)]'
-          : 'border-l shadow-[inset_0.0625rem_0_0_color-mix(in_srgb,white_18%,transparent)]'
-      )}
+      className="before:pointer-events-none relative flex h-full w-full min-w-0 flex-col overflow-hidden bg-(--ui-sidebar-surface-background) text-(--ui-text-tertiary)"
     >
       {(loading || isRepo) && (
-        <RightSidebarSectionHeader data-suppress-pane-reveal-side="">
+        <RightWorkspaceSectionHeader data-suppress-pane-reveal-side="">
           <div className="flex min-w-0 flex-1">
             <SidebarPanelLabel>{c.review}</SidebarPanelLabel>
           </div>
@@ -138,7 +130,7 @@ export function ReviewPane() {
               <Codicon name="close" size="0.8125rem" />
             </Button>
           </Tip>
-        </RightSidebarSectionHeader>
+        </RightWorkspaceSectionHeader>
       )}
 
       {loading || isRepo ? (
@@ -236,6 +228,6 @@ export function ReviewPane() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </aside>
+    </div>
   )
 }

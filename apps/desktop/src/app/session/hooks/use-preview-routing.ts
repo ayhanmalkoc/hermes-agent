@@ -84,7 +84,7 @@ export function usePreviewRouting({
       }
     }
 
-    void normalizeOrLocalPreviewTarget(record.target).then(target => {
+    void normalizeOrLocalPreviewTarget(record.target, currentCwd || undefined).then(target => {
       if (!cancelled) {
         setPreviewTarget(restoredPreviewTarget(target ?? record.normalized))
       }
@@ -93,7 +93,7 @@ export function usePreviewRouting({
     return () => {
       cancelled = true
     }
-  }, [currentView, previewRegistry, previewSessionId])
+  }, [currentCwd, currentView, previewRegistry, previewSessionId])
 
   const restartPreviewServer = useCallback(
     async (url: string, context?: string) => {

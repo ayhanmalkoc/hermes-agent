@@ -22,7 +22,6 @@ function normalizeHttpUrl(value: string): string | null {
 function normalizeBrowserTargetUrl(value: string): string | null {
   const raw = value.trim()
   if (/^file:\/\//i.test(raw)) return raw
-  if (/^data:text\/html[;,]/i.test(raw)) return raw
   return normalizeHttpUrl(raw)
 }
 
@@ -31,12 +30,16 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   const [draftUrl, setDraftUrl] = useState(tab.url || 'https://example.com')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [canGoBack, setCanGoBack] = useState(false)
+  const [canGoForward, setCanGoForward] = useState(false)
   const currentUrl = useMemo(() => normalizeBrowserTargetUrl(tab.url || draftUrl) || 'https://example.com/', [draftUrl, tab.url])
 
   useEffect(() => {
     setDraftUrl(tab.url || 'https://example.com')
     setError(null)
     setLoading(false)
+    setCanGoBack(false)
+    setCanGoForward(false)
   }, [tab.id, tab.url])
 
   useEffect(() => {
@@ -64,6 +67,18 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
     }
 
     setError(null)
+    const unsubscribe = api.onState?.(tab.id, payload => {
+      if (typeof payload.url === 'string' && payload.url) {
+        setDraftUrl(payload.url)
+        updateRightWorkspaceTab(tab.id, { url: payload.url, title: payload.title || payload.url })
+      } else if (payload.title) {
+        updateRightWorkspaceTab(tab.id, { title: payload.title })
+      }
+      if (typeof payload.loading === 'boolean') setLoading(payload.loading)
+      if (typeof payload.canGoBack === 'boolean') setCanGoBack(payload.canGoBack)
+      if (typeof payload.canGoForward === 'boolean') setCanGoForward(payload.canGoForward)
+      if (payload.error !== undefined) setError(payload.error || null)
+    })
     void api.show(tab.id, currentUrl).then(() => {
       if (!disposed) {
         setError(null)
@@ -81,14 +96,15 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
       window.cancelAnimationFrame(frame)
       observer.disconnect()
       window.removeEventListener('resize', scheduleBounds)
+      unsubscribe?.()
       void api.hide(tab.id).catch(() => undefined)
     }
   }, [currentUrl, tab.id])
 
   const load = (value = draftUrl) => {
-    const next = normalizeHttpUrl(value)
+    const next = normalizeBrowserTargetUrl(value)
     if (!next) {
-      setError('Only http:// and https:// URLs are supported.')
+      setError('Only http://, https://, and safe file preview URLs are supported.')
       return
     }
 
@@ -102,8 +118,8 @@ export function BrowserWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-(--ui-editor-surface-background)">
       <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-(--ui-stroke-quaternary) px-2">
-        <Tip label="Back"><Button aria-label="Back" className="h-7 w-7" onClick={() => void window.hermesDesktop?.browser.back(tab.id)} size="icon-xs" variant="ghost"><Codicon name="arrow-left" size="0.85rem" /></Button></Tip>
-        <Tip label="Forward"><Button aria-label="Forward" className="h-7 w-7" onClick={() => void window.hermesDesktop?.browser.forward(tab.id)} size="icon-xs" variant="ghost"><Codicon name="arrow-right" size="0.85rem" /></Button></Tip>
+        <Tip label="Back"><Button aria-label="Back" className="h-7 w-7" disabled={!canGoBack} onClick={() => void window.hermesDesktop?.browser.back(tab.id)} size="icon-xs" variant="ghost"><Codicon name="arrow-left" size="0.85rem" /></Button></Tip>
+        <Tip label="Forward"><Button aria-label="Forward" className="h-7 w-7" disabled={!canGoForward} onClick={() => void window.hermesDesktop?.browser.forward(tab.id)} size="icon-xs" variant="ghost"><Codicon name="arrow-right" size="0.85rem" /></Button></Tip>
         <Tip label={loading ? 'Stop' : 'Reload'}>
           <Button aria-label={loading ? 'Stop' : 'Reload'} className="h-7 w-7" onClick={() => void (loading ? window.hermesDesktop?.browser.stop(tab.id) : window.hermesDesktop?.browser.reload(tab.id))} size="icon-xs" variant="ghost">
             <Codicon name={loading ? 'debug-stop' : 'refresh'} size="0.85rem" />

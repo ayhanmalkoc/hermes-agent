@@ -1486,6 +1486,19 @@ _FS_MIME_TYPES = {
     ".webm": "video/webm",
     ".webp": "image/webp",
 }
+_FS_SENSITIVE_NAMES = {
+    ".env",
+    ".npmrc",
+    ".pypirc",
+    "credentials",
+    "credentials.json",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_rsa",
+    "known_hosts",
+}
+_FS_SENSITIVE_SUFFIXES = (".key", ".pem", ".p12", ".pfx")
 
 
 def _fs_path(raw_path: str) -> Path:
@@ -1525,8 +1538,15 @@ def _fs_looks_binary(data: bytes) -> bool:
     return suspicious / len(data) > 0.12
 
 
+def _fs_reject_sensitive_file(path: Path) -> None:
+    name = path.name.lower()
+    if name in _FS_SENSITIVE_NAMES or name.startswith(".env.") or name.endswith(_FS_SENSITIVE_SUFFIXES):
+        raise HTTPException(status_code=403, detail="Sensitive file preview is blocked")
+
+
 def _fs_regular_file(path: Path) -> tuple[Path, os.stat_result]:
     target = _fs_path(str(path))
+    _fs_reject_sensitive_file(target)
     try:
         st = target.stat()
     except FileNotFoundError:

@@ -595,7 +595,6 @@ const MEDIA_MIME_TYPES = {
 }
 
 const PREVIEW_HTML_EXTENSIONS = new Set(['.html', '.htm'])
-const PREVIEW_WATCH_DEBOUNCE_MS = 120
 const LOCAL_PREVIEW_HOSTS = new Set(['0.0.0.0', '127.0.0.1', '::1', '[::1]', 'localhost'])
 const TEXT_PREVIEW_MAX_BYTES = 512 * 1024
 const PREVIEW_LANGUAGE_BY_EXT = {
@@ -835,7 +834,6 @@ let bootstrapAbortController = null
 let connectionConfigCache = null
 let connectionConfigCacheMtime = null
 const hermesLog = []
-const previewWatchers = new Map()
 let previewShortcutActive = false
 let desktopLogBuffer = ''
 let desktopLogFlushTimer = null
@@ -1041,6 +1039,26 @@ function openExternalUrl(rawUrl) {
 
 const browserWorkspaceViews = new Map()
 
+function browserWorkspaceState(id, view, extra = {}) {
+  const contents = view?.webContents
+  return {
+    canGoBack: Boolean(contents?.canGoBack?.()),
+    canGoForward: Boolean(contents?.canGoForward?.()),
+    id: String(id || ''),
+    loading: Boolean(contents?.isLoading?.()),
+    title: contents?.getTitle?.() || '',
+    url: contents?.getURL?.() || '',
+    ...extra
+  }
+}
+
+function sendBrowserWorkspaceState(id, view, extra = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  const { webContents } = mainWindow
+  if (!webContents || webContents.isDestroyed()) return
+  webContents.send('hermes:browser:state', browserWorkspaceState(id, view, extra))
+}
+
 function normalizeBrowserWorkspaceUrl(rawUrl) {
   const raw = String(rawUrl || '').trim()
   if (!raw) throw new Error('Browser URL required')
@@ -1062,6 +1080,16 @@ function normalizeBrowserWorkspaceUrl(rawUrl) {
   }
 
   return parsed.toString()
+}
+
+async function normalizeBrowserWorkspaceLoadUrl(rawUrl) {
+  const raw = String(rawUrl || '').trim()
+  if (/^file:/i.test(raw)) {
+    const { resolvedPath } = await resolveReadableFileForIpc(raw, { purpose: 'Browser file preview' })
+    return pathToFileURL(resolvedPath).toString()
+  }
+
+  return normalizeBrowserWorkspaceUrl(raw)
 }
 
 function ensureBrowserWorkspaceView(id) {
@@ -1087,11 +1115,30 @@ function ensureBrowserWorkspaceView(id) {
     openExternalUrl(details.url)
     return { action: 'deny' }
   })
+  view.webContents.on('before-input-event', (event, input) => {
+    if ((input.control || input.meta) && String(input.key || '').toLowerCase() === 'w') {
+      event.preventDefault()
+    }
+  })
   view.webContents.on('will-navigate', (event, url) => {
     try {
       normalizeBrowserWorkspaceUrl(url)
     } catch {
       event.preventDefault()
+    }
+  })
+  view.webContents.on('did-start-loading', () => sendBrowserWorkspaceState(key, view, { error: null, loading: true }))
+  view.webContents.on('did-stop-loading', () => sendBrowserWorkspaceState(key, view, { error: null, loading: false }))
+  view.webContents.on('did-navigate', (_event, url) => sendBrowserWorkspaceState(key, view, { error: null, loading: false, url }))
+  view.webContents.on('did-navigate-in-page', (_event, url) => sendBrowserWorkspaceState(key, view, { error: null, url }))
+  view.webContents.on('page-title-updated', (_event, title) => sendBrowserWorkspaceState(key, view, { title }))
+  view.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (isMainFrame && errorCode !== -3) {
+      sendBrowserWorkspaceState(key, view, {
+        error: `${errorDescription || 'Navigation failed'} (${errorCode})`,
+        loading: false,
+        url: validatedURL || view.webContents.getURL()
+      })
     }
   })
   browserWorkspaceViews.set(key, view)
@@ -3876,68 +3923,6 @@ async function normalizePreviewTarget(rawTarget, baseDir) {
     return await previewFileTarget(raw, baseDir)
   } catch {
     return null
-  }
-}
-
-async function filePathFromPreviewUrl(rawUrl) {
-  const { resolvedPath } = await resolveReadableFileForIpc(String(rawUrl || ''), { purpose: 'Preview file' })
-  return resolvedPath
-}
-
-function sendPreviewFileChanged(payload) {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-  const { webContents } = mainWindow
-  if (!webContents || webContents.isDestroyed()) return
-  webContents.send('hermes:preview-file-changed', payload)
-}
-
-async function watchPreviewFile(rawUrl) {
-  const filePath = await filePathFromPreviewUrl(rawUrl)
-  const watchDir = path.dirname(filePath)
-  const targetName = path.basename(filePath)
-  const id = crypto.randomBytes(12).toString('base64url')
-  let timer = null
-  const watcher = fs.watch(watchDir, (_eventType, filename) => {
-    const changedName = filename ? path.basename(String(filename)) : ''
-
-    if (changedName && changedName !== targetName) {
-      return
-    }
-
-    if (timer) clearTimeout(timer)
-    timer = setTimeout(() => {
-      timer = null
-      if (!fileExists(filePath)) return
-      sendPreviewFileChanged({ id, path: filePath, url: pathToFileURL(filePath).toString() })
-    }, PREVIEW_WATCH_DEBOUNCE_MS)
-  })
-
-  previewWatchers.set(id, {
-    close: () => {
-      if (timer) clearTimeout(timer)
-      watcher.close()
-    }
-  })
-
-  return { id, path: filePath }
-}
-
-function stopPreviewFileWatch(id) {
-  const watcher = previewWatchers.get(id)
-
-  if (!watcher) {
-    return false
-  }
-
-  watcher.close()
-  previewWatchers.delete(id)
-
-  return true
-}
-
-function closePreviewWatchers() {
-  for (const id of previewWatchers.keys()) {
-    stopPreviewFileWatch(id)
   }
 }
 
@@ -6737,10 +6722,6 @@ ipcMain.handle('hermes:normalizePreviewTarget', (_event, target, baseDir) =>
   normalizePreviewTarget(String(target || ''), baseDir ? String(baseDir) : '')
 )
 
-ipcMain.handle('hermes:watchPreviewFile', (_event, url) => watchPreviewFile(String(url || '')))
-
-ipcMain.handle('hermes:stopPreviewFileWatch', (_event, id) => stopPreviewFileWatch(String(id || '')))
-
 ipcMain.on('hermes:titlebar-theme', (_event, payload) => {
   if (!payload || !isHexColor(payload.background) || !isHexColor(payload.foreground)) {
     return
@@ -6789,11 +6770,12 @@ ipcMain.handle('hermes:openExternal', (_event, url) => {
 })
 
 ipcMain.handle('hermes:browser:show', async (_event, id, url) => {
-  const nextUrl = normalizeBrowserWorkspaceUrl(url)
+  const nextUrl = await normalizeBrowserWorkspaceLoadUrl(url)
   const view = attachBrowserWorkspaceView(id)
   if (view.webContents.getURL() !== nextUrl) {
     await view.webContents.loadURL(nextUrl)
   }
+  sendBrowserWorkspaceState(id, view, { error: null, url: nextUrl })
   return { ok: true, url: nextUrl }
 })
 
@@ -6805,31 +6787,38 @@ ipcMain.handle('hermes:browser:setBounds', (_event, id, bounds) => {
 })
 
 ipcMain.handle('hermes:browser:load', async (_event, id, url) => {
-  const nextUrl = normalizeBrowserWorkspaceUrl(url)
+  const nextUrl = await normalizeBrowserWorkspaceLoadUrl(url)
   const view = attachBrowserWorkspaceView(id)
   await view.webContents.loadURL(nextUrl)
+  sendBrowserWorkspaceState(id, view, { error: null, url: nextUrl })
   return { ok: true, url: nextUrl }
 })
 
 ipcMain.handle('hermes:browser:back', (_event, id) => {
   const view = ensureBrowserWorkspaceView(id)
   if (view.webContents.canGoBack()) view.webContents.goBack()
+  sendBrowserWorkspaceState(id, view)
   return { ok: true }
 })
 
 ipcMain.handle('hermes:browser:forward', (_event, id) => {
   const view = ensureBrowserWorkspaceView(id)
   if (view.webContents.canGoForward()) view.webContents.goForward()
+  sendBrowserWorkspaceState(id, view)
   return { ok: true }
 })
 
 ipcMain.handle('hermes:browser:reload', (_event, id) => {
-  ensureBrowserWorkspaceView(id).webContents.reload()
+  const view = ensureBrowserWorkspaceView(id)
+  view.webContents.reload()
+  sendBrowserWorkspaceState(id, view, { error: null, loading: true })
   return { ok: true }
 })
 
 ipcMain.handle('hermes:browser:stop', (_event, id) => {
-  ensureBrowserWorkspaceView(id).webContents.stop()
+  const view = ensureBrowserWorkspaceView(id)
+  view.webContents.stop()
+  sendBrowserWorkspaceState(id, view, { loading: false })
   return { ok: true }
 })
 
@@ -7778,7 +7767,6 @@ app.on('before-quit', () => {
     desktopLogFlushTimer = null
   }
   flushDesktopLogBufferSync()
-  closePreviewWatchers()
 
   // Kill open PTYs before environment teardown to avoid the node-pty#904
   // ThreadSafeFunction SIGABRT race.

@@ -169,11 +169,11 @@ function RightWorkspaceHeader({ gateway }: { gateway?: HermesGateway | null }) {
 
   return (
     <div className="flex h-9 shrink-0 items-center border-b border-(--ui-stroke-quaternary) bg-(--ui-editor-surface-background) px-2">
-      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+      <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {tabs.map(tab => (
           <button
             className={cn(
-              'group flex h-7 max-w-40 items-center gap-1.5 rounded-lg px-2 text-left text-xs transition',
+              'group flex h-7 max-w-40 shrink-0 items-center gap-1.5 rounded-lg px-2 text-left text-xs transition',
               active?.id === tab.id
                 ? 'bg-(--ui-hover-background) text-(--ui-text-primary)'
                 : 'text-(--ui-text-tertiary) hover:bg-(--ui-hover-background) hover:text-(--ui-text-secondary)'

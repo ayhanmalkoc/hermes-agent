@@ -1,6 +1,6 @@
 import { atom, computed } from 'nanostores'
 
-import { openBrowserWorkspace, openFilesWorkspaceTarget } from './right-workspace'
+import { closeEphemeralRightWorkspaceTabsForTarget, openBrowserWorkspace, openFilesWorkspaceTarget } from './right-workspace'
 import { $activeSessionId, $selectedStoredSessionId } from './session'
 
 export interface PreviewTarget {
@@ -89,13 +89,14 @@ function isBrowserPreviewTarget(target: PreviewTarget, source: PreviewRecordSour
 
 export function openPreviewTarget(target: PreviewTarget, source: PreviewRecordSource): void {
   const normalized = previewTargetForSource(target, source)
+  const ephemeral = !isFileSourceOpen(source)
 
   if (isBrowserPreviewTarget(normalized, source)) {
-    openBrowserWorkspace(normalized.url)
+    openBrowserWorkspace(normalized.url, true, { ephemeral })
     return
   }
 
-  openFilesWorkspaceTarget(normalized)
+  openFilesWorkspaceTarget(normalized, { ephemeral })
 }
 
 export function setPreviewTarget(target: PreviewTarget | null) {
@@ -365,6 +366,7 @@ export function dismissPreviewTarget() {
 
   if (current?.url) {
     dismissSessionPreview(currentPreviewSessionId(), current.url)
+    closeEphemeralRightWorkspaceTabsForTarget(current)
   }
 
   $previewTarget.set(null)

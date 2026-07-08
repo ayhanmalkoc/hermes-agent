@@ -1,7 +1,6 @@
 import { useStore } from '@nanostores/react'
 
-import { LocalFilePreview } from '@/app/chat/right-rail/preview-file'
-import { readDesktopFileText } from '@/lib/desktop-fs'
+import { isDesktopFsRemoteMode, readDesktopFileText } from '@/lib/desktop-fs'
 import { Button } from '@/components/ui/button'
 import { Codicon } from '@/components/ui/codicon'
 import {
@@ -23,6 +22,7 @@ import {
 
 import { ProjectTree } from '../../right-sidebar/files/tree'
 import { useProjectTree } from '../../right-sidebar/files/use-project-tree'
+import { LocalFilePreview } from '../files/local-file-preview'
 
 function breadcrumbFor(cwd: string, source: string | undefined): string {
   if (!source) {
@@ -137,6 +137,8 @@ function FilesTreeColumn({ tab }: { tab: RightWorkspaceTab }) {
 export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
   const currentCwd = useStore($currentCwd).trim()
   const target = tab.target ?? null
+  const targetPath = target?.path || target?.source || ''
+  const remoteGateway = isDesktopFsRemoteMode()
   const breadcrumb = breadcrumbFor(currentCwd, tab.selectedPath ?? target?.source)
   const showRichPreviewToggle = isMarkdownTarget(target)
   const showWordWrapToggle = supportsWordWrap(target)
@@ -154,17 +156,17 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem disabled={!target} onClick={() => target && void copyText(target.source)}>
+            <DropdownMenuItem disabled={!target} onClick={() => target && void copyText(targetPath)}>
               <Codicon className="mr-2" name="copy" size="0.875rem" />
               Copy path
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={!target} onClick={() => target && void copyFileContent(target.source)}>
+            <DropdownMenuItem disabled={!target} onClick={() => target && void copyFileContent(targetPath)}>
               <Codicon className="mr-2" name="copy" size="0.875rem" />
               Copy file content
             </DropdownMenuItem>
-            <DropdownMenuItem disabled={!target} onClick={() => target && void revealFile(target.source)}>
+            <DropdownMenuItem disabled={!target || remoteGateway} onClick={() => target && !remoteGateway && void revealFile(targetPath)}>
               <Codicon className="mr-2" name="go-to-file" size="0.875rem" />
-              Reveal file
+              {remoteGateway ? 'Reveal unavailable on remote gateway' : 'Reveal file'}
             </DropdownMenuItem>
             {showRichPreviewToggle && (
               <DropdownMenuItem onClick={() => updateRightWorkspaceTab(tab.id, { richPreviewEnabled: !tab.richPreviewEnabled })}>
@@ -180,7 +182,7 @@ export function FilesWorkspaceTab({ tab }: { tab: RightWorkspaceTab }) {
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button disabled={!target} onClick={() => target && void revealFile(target.source)} size="xs" variant="secondary">
+        <Button disabled={!target || remoteGateway} onClick={() => target && !remoteGateway && void revealFile(targetPath)} size="xs" variant="secondary">
           Reveal
         </Button>
         <Tip label={tab.treeVisible ? 'Hide files' : 'Show files'}>

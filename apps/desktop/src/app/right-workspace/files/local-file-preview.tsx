@@ -595,27 +595,12 @@ export function LocalFilePreview({
 
       try {
         if (isMedia) {
-          let byteSize = target.byteSize
-
-          if (filesMode && byteSize === undefined) {
-            const metadata = await readTextPreview(filePath, previewMaxBytes)
-            byteSize = metadata.byteSize
-
-            if ((byteSize ?? 0) > previewMaxBytes) {
-              if (active) {
-                setState({ byteSize, loading: false })
-              }
-
-              return
-            }
-          }
-
           // Prefer bytes the caller already handed us (a pasted/dropped
           // screenshot) over re-reading a path that may be transient/unreadable.
           const dataUrl = target.dataUrl || (await readDesktopFileDataUrl(filePath))
 
           if (active) {
-            setState({ byteSize, dataUrl, loading: false })
+            setState({ byteSize: target.byteSize, dataUrl, loading: false })
           }
 
           return
