@@ -85,6 +85,9 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
     show: (id, url) => ipcRenderer.invoke('hermes:browser:show', id, url),
     stop: id => ipcRenderer.invoke('hermes:browser:stop', id)
   },
+  rightWorkspace: {
+    showNewTabMenu: items => ipcRenderer.invoke('hermes:rightWorkspace:showNewTabMenu', items)
+  },
   fetchLinkTitle: url => ipcRenderer.invoke('hermes:fetchLinkTitle', url),
   sanitizeWorkspaceCwd: cwd => ipcRenderer.invoke('hermes:workspace:sanitize', cwd),
   settings: {

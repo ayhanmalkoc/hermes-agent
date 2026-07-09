@@ -90,6 +90,9 @@ declare global {
         show: (id: string, url: string) => Promise<{ ok: boolean; url: string }>
         stop: (id: string) => Promise<{ ok: boolean }>
       }
+      rightWorkspace?: {
+        showNewTabMenu: (items: Array<{ hint?: string; kind: string; label: string }>) => Promise<null | string>
+      }
       fetchLinkTitle: (url: string) => Promise<string>
       sanitizeWorkspaceCwd: (cwd?: null | string) => Promise<{ cwd: string; sanitized: boolean }>
       settings: {

@@ -6771,6 +6771,35 @@ ipcMain.handle('hermes:openExternal', (_event, url) => {
   }
 })
 
+ipcMain.handle('hermes:rightWorkspace:showNewTabMenu', async (_event, items) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return null
+
+  const menuItems = Array.isArray(items) ? items : []
+  const allowedKinds = new Set(['review', 'terminal', 'browser', 'files'])
+  let didSelect = false
+  let resolveSelection = () => undefined
+  const template = menuItems
+    .filter(item => item && allowedKinds.has(String(item.kind || '')))
+    .map(item => ({
+      accelerator: typeof item.hint === 'string' ? item.hint.replace(/^Ctrl\+/, 'CommandOrControl+') : undefined,
+      click: () => {
+        didSelect = true
+        resolveSelection(String(item.kind))
+      },
+      label: String(item.label || item.kind)
+    }))
+
+  if (template.length === 0) return null
+
+  const selected = await new Promise(resolve => {
+    resolveSelection = resolve
+    const menu = Menu.buildFromTemplate(template)
+    menu.popup({ callback: () => { if (!didSelect) resolve(null) }, window: mainWindow })
+  })
+
+  return selected
+})
+
 ipcMain.handle('hermes:browser:show', async (_event, id, url) => {
   const nextUrl = await normalizeBrowserWorkspaceLoadUrl(url)
   const view = attachBrowserWorkspaceView(id)

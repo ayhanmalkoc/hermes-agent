@@ -60,6 +60,22 @@ function openKind(kind: RightWorkspaceTabKind): void {
   }
 }
 
+interface NewTabMenuItem {
+  hint?: string
+  icon: string
+  kind: RightWorkspaceTabKind
+  label: string
+}
+
+function newTabMenuItems(reviewOpen: boolean): NewTabMenuItem[] {
+  return [
+    ...(reviewOpen ? [] : [{ hint: 'Ctrl+Shift+G', icon: 'diff', kind: 'review' as const, label: 'Review' }]),
+    { icon: 'terminal', kind: 'terminal', label: 'Terminal' },
+    { icon: 'globe', kind: 'browser', label: 'Browser' },
+    { hint: 'Ctrl+P', icon: 'folder-opened', kind: 'files', label: 'Files' }
+  ]
+}
+
 function tabTitle(tab: RightWorkspaceTab, terminals: readonly { id: string; title: string }[]): string {
   if (tab.kind !== 'terminal' || !tab.terminalId) {
     return tab.title
@@ -95,8 +111,28 @@ function closeTab(tab: RightWorkspaceTab, gateway?: HermesGateway | null): void 
 }
 
 function NewTabMenu() {
+  const active = useStore($activeRightWorkspaceTab)
   const tabs = useStore($rightWorkspaceTabs)
   const reviewOpen = tabs.some(tab => tab.kind === 'review')
+  const items = newTabMenuItems(reviewOpen)
+
+  if (active?.kind === 'browser') {
+    return (
+      <Button
+        aria-label="New tab"
+        className="h-7 w-7 rounded-lg"
+        onClick={() => void window.hermesDesktop?.rightWorkspace?.showNewTabMenu(items).then(kind => {
+          if (kind === 'review' || kind === 'terminal' || kind === 'browser' || kind === 'files') {
+            openKind(kind)
+          }
+        })}
+        size="icon-xs"
+        variant="ghost"
+      >
+        <Codicon name="add" size="0.875rem" />
+      </Button>
+    )
+  }
 
   return (
     <DropdownMenu>
@@ -106,26 +142,13 @@ function NewTabMenu() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-56">
-        {!reviewOpen && (
-          <DropdownMenuItem onClick={() => openKind('review')}>
-            <Codicon className="mr-2" name="diff" size="0.875rem" />
-            <span className="flex-1">Review</span>
-            <span className="text-[0.68rem] text-muted-foreground">Ctrl+Shift+G</span>
+        {items.map(item => (
+          <DropdownMenuItem key={item.kind} onClick={() => openKind(item.kind)}>
+            <Codicon className="mr-2" name={item.icon} size="0.875rem" />
+            <span className="flex-1">{item.label}</span>
+            {item.hint && <span className="text-[0.68rem] text-muted-foreground">{item.hint}</span>}
           </DropdownMenuItem>
-        )}
-        <DropdownMenuItem onClick={() => openKind('terminal')}>
-          <Codicon className="mr-2" name="terminal" size="0.875rem" />
-          <span className="flex-1">Terminal</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openKind('browser')}>
-          <Codicon className="mr-2" name="globe" size="0.875rem" />
-          <span className="flex-1">Browser</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => openKind('files')}>
-          <Codicon className="mr-2" name="folder-opened" size="0.875rem" />
-            <span className="flex-1">Files</span>
-          <span className="text-[0.68rem] text-muted-foreground">Ctrl+P</span>
-        </DropdownMenuItem>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -134,12 +157,7 @@ function NewTabMenu() {
 function RightWorkspaceLauncher() {
   const tabs = useStore($rightWorkspaceTabs)
   const reviewOpen = tabs.some(tab => tab.kind === 'review')
-  const items: Array<{ hint?: string; icon: string; kind: RightWorkspaceTabKind; label: string }> = [
-    ...(reviewOpen ? [] : [{ hint: 'Ctrl+Shift+G', icon: 'diff', kind: 'review' as const, label: 'Review' }]),
-    { icon: 'terminal', kind: 'terminal', label: 'Terminal' },
-    { icon: 'globe', kind: 'browser', label: 'Browser' },
-    { hint: 'Ctrl+P', icon: 'folder-opened', kind: 'files', label: 'Files' }
-  ]
+  const items = newTabMenuItems(reviewOpen)
 
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center p-6">
