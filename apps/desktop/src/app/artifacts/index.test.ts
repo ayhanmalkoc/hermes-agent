@@ -59,4 +59,25 @@ describe('collectArtifactsForSession', () => {
       value: 'https://example.com/changelog/latest'
     })
   })
+
+  it('keeps session cwd on localhost preview links so preview can resolve static files', () => {
+    const artifacts = collectArtifactsForSession(
+      makeSession({ cwd: '/var/lib/hermes/hermes-2/hermes-remote-preview-launch' }),
+      [
+        {
+          content: 'Preview: http://127.0.0.1:8731/index.html',
+          role: 'assistant',
+          timestamp: 2000
+        }
+      ]
+    )
+
+    expect(artifacts).toHaveLength(1)
+    expect(artifacts[0]).toMatchObject({
+      cwd: '/var/lib/hermes/hermes-2/hermes-remote-preview-launch',
+      href: 'http://127.0.0.1:8731/index.html',
+      kind: 'link',
+      value: 'http://127.0.0.1:8731/index.html'
+    })
+  })
 })

@@ -1284,6 +1284,31 @@ def _preview_proxy_resolve(raw_url: str) -> dict[str, Any]:
     }
 
 
+def _preview_loopback_static_file_resolve(raw_url: str, cwd: str | None = None) -> dict[str, Any] | None:
+    if not cwd:
+        return None
+    parsed = _preview_proxy_target(raw_url)
+    rel = urllib.parse.unquote(parsed.path or "").lstrip("/") or "index.html"
+    rel_path = Path(rel)
+    if rel_path.is_absolute() or ".." in rel_path.parts:
+        raise HTTPException(status_code=400, detail="Invalid preview path")
+    root = Path(cwd).expanduser().resolve(strict=False)
+    target = (root / rel_path).resolve(strict=False)
+    if not _path_is_under(root, target):
+        raise HTTPException(status_code=403, detail="Path outside preview root")
+    if target.suffix.lower() not in _HTML_PREVIEW_EXTENSIONS:
+        return None
+    try:
+        result = _preview_file_resolve(str(target))
+    except HTTPException as exc:
+        if exc.status_code == 404:
+            return None
+        raise
+    if parsed.query:
+        result["url"] = f"{result['url']}?{parsed.query}"
+    return result
+
+
 def _preview_is_loopback_url(raw: str) -> bool:
     try:
         _preview_proxy_target(raw)
@@ -1300,6 +1325,9 @@ async def resolve_preview_target(payload: PreviewResolveRequest, request: Reques
         raise HTTPException(status_code=400, detail="Preview target is required")
     if raw.lower().startswith(("http://", "https://")):
         if _preview_is_loopback_url(raw):
+            static_file = _preview_loopback_static_file_resolve(raw, payload.cwd)
+            if static_file is not None:
+                return static_file
             return _preview_proxy_resolve(raw)
         return {"kind": "url", "label": raw, "source": raw, "url": raw}
     return _preview_file_resolve(raw, payload.cwd)

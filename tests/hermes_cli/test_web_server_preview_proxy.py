@@ -47,6 +47,61 @@ def test_preview_file_resolve_creates_signed_file_url(tmp_path):
     assert result['url'].endswith('/index.html')
 
 
+def test_loopback_html_url_prefers_static_file_when_cwd_matches(tmp_path):
+    html = tmp_path / 'index.html'
+    html.write_text('<h1>OK</h1>', encoding='utf-8')
+
+    result = web_server._preview_loopback_static_file_resolve(
+        'http://127.0.0.1:8731/index.html',
+        str(tmp_path),
+    )
+
+    assert result is not None
+    assert result['kind'] == 'file'
+    assert result['path'] == str(html)
+    assert result['url'].startswith('/api/preview/file/')
+    assert result['url'].endswith('/index.html')
+
+
+def test_loopback_root_url_prefers_index_html_when_cwd_matches(tmp_path):
+    html = tmp_path / 'index.html'
+    html.write_text('<h1>OK</h1>', encoding='utf-8')
+
+    result = web_server._preview_loopback_static_file_resolve(
+        'http://localhost:8731/?v=1',
+        str(tmp_path),
+    )
+
+    assert result is not None
+    assert result['kind'] == 'file'
+    assert result['path'] == str(html)
+    assert result['url'].endswith('/index.html?v=1')
+
+
+def test_loopback_html_url_falls_back_to_proxy_when_static_file_missing(tmp_path):
+    result = web_server._preview_loopback_static_file_resolve(
+        'http://127.0.0.1:8731/index.html',
+        str(tmp_path),
+    )
+
+    assert result is None
+
+
+def test_loopback_static_file_rejects_path_traversal(tmp_path):
+    secret = tmp_path.parent / 'secret.html'
+    secret.write_text('<h1>secret</h1>', encoding='utf-8')
+
+    try:
+        web_server._preview_loopback_static_file_resolve(
+            'http://127.0.0.1:8731/%2e%2e/secret.html',
+            str(tmp_path),
+        )
+    except Exception as exc:
+        assert getattr(exc, 'status_code', None) == 400
+    else:
+        raise AssertionError('loopback static file traversal should be rejected')
+
+
 def test_preview_file_resolve_blocks_sensitive_files(tmp_path):
     env_file = tmp_path / '.env.html'
     env_file.write_text('<h1>secret</h1>', encoding='utf-8')

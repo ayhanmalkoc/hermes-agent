@@ -33,6 +33,42 @@ describe('localPreviewTarget', () => {
     })
   })
 
+  it('lets the remote resolver map localhost HTML URLs to file previews when cwd matches', async () => {
+    $connection.set({ mode: 'remote', baseUrl: 'https://gw', token: 't' } as never)
+    const api = vi.fn(async () => ({
+      kind: 'file',
+      label: 'index.html',
+      mime_type: 'text/html',
+      path: '/var/lib/hermes/hermes-2/hermes-remote-preview-launch/index.html',
+      url: '/api/preview/file/signed/index.html'
+    }))
+    vi.stubGlobal('window', {
+      hermesDesktop: {
+        api
+      }
+    })
+
+    const target = await normalizeOrLocalPreviewTarget(
+      'http://127.0.0.1:8731/index.html',
+      '/var/lib/hermes/hermes-2/hermes-remote-preview-launch'
+    )
+
+    expect(target).toMatchObject({
+      kind: 'file',
+      path: '/var/lib/hermes/hermes-2/hermes-remote-preview-launch/index.html',
+      previewKind: 'html',
+      url: 'https://gw/api/preview/file/signed/index.html'
+    })
+    expect(api).toHaveBeenCalledWith({
+      body: {
+        cwd: '/var/lib/hermes/hermes-2/hermes-remote-preview-launch',
+        target: 'http://127.0.0.1:8731/index.html'
+      },
+      method: 'POST',
+      path: '/api/preview/resolve'
+    })
+  })
+
   it('does not leak remote file previews as local file URLs', () => {
     $connection.set({ mode: 'remote', baseUrl: 'https://gw', token: 't' } as never)
 
